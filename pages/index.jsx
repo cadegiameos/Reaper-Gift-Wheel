@@ -186,6 +186,36 @@ export default function Home() {
   };
 
   // --- Placeholder for YouTube polling (coming next) ---
+    // Poll YouTube for new gifted memberships (only when connected)
+  useEffect(() => {
+    if (!ytConnected) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch("/api/youtube-gifts");
+        if (!res.ok) return;
+
+        const data = await res.json();
+        // Expecting something like: { newEntries: [{ name: "John", amount: 5 }, ...] }
+        if (Array.isArray(data.newEntries) && data.newEntries.length > 0) {
+          for (const entry of data.newEntries) {
+            const res2 = await fetch("/api/entries", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: entry.name, amount: entry.amount }),
+            });
+            const updated = await res2.json();
+            if (Array.isArray(updated.entries)) setEntries(updated.entries);
+          }
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 5000); // every 5 seconds
+
+    return () => clearInterval(poll);
+  }, [ytConnected]);
+
 
   return (
     <div

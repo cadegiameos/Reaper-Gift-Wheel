@@ -9,11 +9,11 @@ export default function Home() {
   const [winnerIndex, setWinnerIndex] = useState(null);
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [ytConnected, setYtConnected] = useState(false);
-
+  const [ytConnected, setYtConnected] = useState(false); // YouTube connected?
+  
   const canvasRef = useRef(null);
 
-  // Scale to fit resolution
+  // Compute scale based on window size (unchanged)
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -26,7 +26,8 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load entries
+  // ======= PERSISTENCE (Redis via /api/entries) =======
+  // Load entries on mount (unchanged)
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -40,7 +41,7 @@ export default function Home() {
     loadEntries();
   }, []);
 
-  // Check Youtube connection
+  // Check if YouTube is connected (for permissions)
   useEffect(() => {
     const check = async () => {
       try {
@@ -54,6 +55,7 @@ export default function Home() {
     check();
   }, []);
 
+  // Helper: add entry via API
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -74,6 +76,7 @@ export default function Home() {
     }
   };
 
+  // Helper: clear entries via API (only allowed if ytConnected)
   const clearEntries = async () => {
     if (!ytConnected) return;
     try {
@@ -86,8 +89,8 @@ export default function Home() {
       console.error("Failed to clear entries:", e);
     }
   };
+  // ====================================================
 
-  // Wheel animations
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isSpinning) setRotation((prev) => (prev + 0.1) % 360);
@@ -124,6 +127,7 @@ export default function Home() {
       const startAngle = i * anglePerSlice;
       const endAngle = startAngle + anglePerSlice;
 
+      // Segment
       ctx.beginPath();
       ctx.moveTo(radius, radius);
       ctx.arc(radius, radius, radius, startAngle, endAngle);
@@ -131,6 +135,7 @@ export default function Home() {
       ctx.fill();
       ctx.closePath();
 
+      // Flashing winner highlight
       if (winnerIndex === i && flash) {
         ctx.beginPath();
         ctx.moveTo(radius, radius);
@@ -141,6 +146,7 @@ export default function Home() {
         ctx.closePath();
       }
 
+      // Name placement (center along arc radius)
       ctx.save();
       ctx.translate(radius, radius);
       ctx.rotate(startAngle + anglePerSlice / 2);
@@ -153,7 +159,9 @@ export default function Home() {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#000";
-      ctx.fillText(entry, radius * 0.6, 0);
+
+      const textRadius = radius * 0.6;
+      ctx.fillText(entry, textRadius, 0);
 
       ctx.restore();
     });
@@ -177,88 +185,100 @@ export default function Home() {
     }, 5000);
   };
 
+  // 🧭 Poll YouTube chat every 10 seconds for new gifted memberships
+  useEffect(() => {
+    if (!ytConnected) return;
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch("/api/youtube-gifts");
+        const data = await res.json();
+        if (data.added > 0) {
+          const entriesRes = await fetch("/api/entries");
+          const updated = await entriesRes.json();
+          if (Array.isArray(updated.entries)) setEntries(updated.entries);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000);
+    return () => clearInterval(poll);
+  }, [ytConnected]);
+
   return (
-  <div
-    className="scale-wrapper"
-    style={{
-      position: "absolute",
-      top: "50%",
-      left: "50%",
-      transform: `translate(-50%, -50%) scale(${scale})`,
-      width: "1920px",
-      height: "1080px",
-    }}
-  >
-    {/* TEMP YouTube connect button (only if not connected) */}
-    {!ytConnected && (
-      <button
-        onClick={() => (window.location.href = "/api/auth/google")}
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "60px", // ✅ moved further right
-          padding: "10px 20px",
-          fontSize: "1em",
-          borderRadius: "8px",
-          cursor: "pointer",
-          zIndex: 9999,
-        }}
-      >
-        Connect YouTube (TEMP)
-      </button>
-    )}
+    <div
+      className="scale-wrapper"
+      style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        width: "1920px",
+        height: "1080px",
+      }}
+    >
+      {/* TEMP YouTube connect button (only if not connected) */}
+      {!ytConnected && (
+        <button
+          onClick={() => (window.location.href = "/api/auth/google")}
+          style={{
+            position: "absolute",
+            top: "20px",
+            right: "60px", // Moved further right
+            padding: "10px 20px",
+            fontSize: "1em",
+            borderRadius: "8px",
+            cursor: "pointer",
+            zIndex: 9999,
+          }}
+        >
+          Connect YouTube (TEMP)
+        </button>
+      )}
 
-    {/* ✅ Small floating notice WHEN NOT CONNECTED */}
-    {!ytConnected && (
-      <div
-        style={{
-          position: "absolute",
-          top: "70px",    // ✅ under button
-          right: "60px", // ✅ aligned with button
-          padding: "8px 12px",
-          background: "rgba(0,0,0,0.6)",
-          color: "#fff",
-          borderRadius: "10px",
-          fontSize: "0.95em",
-          lineHeight: 1.2,
-          zIndex: 9999,
-          backdropFilter: "blur(2px)",
-          pointerEvents: "none",
-        }}
-      >
-        Waiting for YouTube editor<br />to connect…
-      </div>
-    )}
+      {/* Small floating notice if not connected */}
+      {!ytConnected && (
+        <div
+          style={{
+            position: "absolute",
+            top: "64px",
+            right: "60px",
+            padding: "8px 12px",
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            borderRadius: "10px",
+            fontSize: "0.95em",
+            lineHeight: 1.2,
+            zIndex: 9999,
+            backdropFilter: "blur(2px)",
+            pointerEvents: "none",
+          }}
+          aria-live="polite"
+        >
+          Waiting for YouTube editor<br />to connect…
+        </div>
+      )}
 
-    {/* ✅ Connected badge */}
-    {ytConnected && (
-      <div
-        style={{
-          position: "absolute",
-          bottom: "20px",
-          right: "20px",
-          padding: "10px 16px",
-          background: "rgba(0, 128, 0, 0.85)",
-          color: "#fff",
-          fontSize: "1.1em",
-          borderRadius: "12px",
-          fontWeight: "bold",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          zIndex: 9999,
-          boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-        }}
-      >
-        ✅ Connected
-      </div>
-    )}
-
-    <div className="container">
-
+      {/* ✅ Green tick in bottom right when connected */}
+      {ytConnected && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "20px",
+            right: "20px",
+            background: "rgba(0,255,0,0.7)",
+            color: "#000",
+            padding: "10px 15px",
+            borderRadius: "50%",
+            fontSize: "1.5em",
+            fontWeight: "bold",
+            zIndex: 9999,
+          }}
+        >
+          ✓
+        </div>
+      )}
 
       <div className="container">
-        {/* ... (REST OF YOUR FILE REMAINS EXACTLY THE SAME — I HAVE NOT MODIFIED ANYTHING BELOW THIS POINT) */}
         <h1
           className="title"
           style={{
@@ -468,7 +488,7 @@ export default function Home() {
             marginTop: "20px",
           }}
         >
-          Developed By Shkrimpi - v1.1.3
+          Developed By Shkrimpi - v1.1.2
         </footer>
       </div>
     </div>

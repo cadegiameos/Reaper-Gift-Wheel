@@ -216,6 +216,29 @@ export default function Home() {
     return () => clearInterval(poll);
   }, [ytConnected]);
 
+// 🧭 Poll YouTube chat every 20 seconds for new gifted memberships
+useEffect(() => {
+  if (!ytConnected) return; // only active when editor is connected
+
+  const poll = setInterval(async () => {
+    try {
+      const res = await fetch("/api/youtube-gifts");
+      const data = await res.json();
+      if (data.added > 0) {
+        console.log("Added from chat:", data.details);
+        // reload entries from Redis
+        const entriesRes = await fetch("/api/entries");
+        const updated = await entriesRes.json();
+        if (Array.isArray(updated.entries)) setEntries(updated.entries);
+      }
+    } catch (err) {
+      console.error("Polling error:", err);
+    }
+  }, 10000); // every 10 seconds
+
+  return () => clearInterval(poll);
+}, [ytConnected]);
+
 
   return (
     <div

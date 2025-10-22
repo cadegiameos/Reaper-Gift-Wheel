@@ -1,0 +1,131 @@
+/* Import Tooth and Nail Regular font */
+@font-face {
+  font-family: 'Tooth and Nail Regular';
+  src: url('/fonts/ToothAndNail-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Reset default margins/padding */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+
+  /* Background image */
+  background-image: url('/background.jpg'); /* place your image in public folder */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Container */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding-bottom: 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Headings */
+.title {
+  font-family: 'Tooth and Nail Regular', Arial, sans-serif;
+  font-size: 3em; /* 2em × 1.5 */
+  margin-bottom: 10px;
+  text-align: center;
+  color: white;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+}
+
+.subtitle {
+  font-family: 'Tooth and Nail Regular', Arial, sans-serif;
+  font-size: 1.8em; /* 1.2em × 1.5 */
+  margin-bottom: 20px;
+  text-align: center;
+  color: white;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+}
+
+/* Wheel container */
+.wheel-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+/* Buttons */
+button {
+  cursor: pointer;
+  border: none;
+  padding: 10px 20px;
+  font-family: Arial, sans-serif;
+  font-size: 1em;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  color: black;
+}
+
+button:hover {
+  opacity: 0.85;
+}
+
+.spin-btn {
+  background-color: #4caf50;
+  margin-right: 10px;
+}
+
+.clear-btn {
+  background-color: #f44336;
+}
+
+/* Controls container */
+.controls {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+/* Manual entry */
+.manual-entry {
+  margin-top: 20px;
+  margin-bottom: 60px;
+  display: flex;
+  flex-direction: column; /* Stack Add Entry and Clear Wheel vertically */
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+
+.manual-entry input[type="text"],
+.manual-entry input[type="number"] {
+  padding: 5px 10px;
+  font-size: 1em;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  width: 150px;
+  text-align: center;
+  color: black;
+}
+
+/* Footer */
+footer {
+  position: fixed;
+  bottom: 10px;
+  font-size: 0.8em;
+  color: white;
+  text-align: center;
+  width: 100%;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+  z-index: 2;
+}

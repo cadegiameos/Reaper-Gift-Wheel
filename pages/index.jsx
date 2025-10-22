@@ -9,11 +9,11 @@ export default function Home() {
   const [winnerIndex, setWinnerIndex] = useState(null);
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [ytConnected, setYtConnected] = useState(false); // ← YouTube connected?
+  const [ytConnected, setYtConnected] = useState(false); // YouTube connected?
 
   const canvasRef = useRef(null);
 
-  // Compute scale based on window size (unchanged)
+  // Compute scale based on window size
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -26,8 +26,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ======= PERSISTENCE (Redis via /api/entries) =======
-  // Load entries on mount (unchanged)
+  // Load entries on mount
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -41,7 +40,7 @@ export default function Home() {
     loadEntries();
   }, []);
 
-  // Check if YouTube is connected (controls temp button + clear permissions)
+  // Check if YouTube is connected 
   useEffect(() => {
     const check = async () => {
       try {
@@ -55,7 +54,33 @@ export default function Home() {
     check();
   }, []);
 
-  // Helper: add entry via API (kept intact; UI inputs disabled below)
+  // Auto-poll YouTube live chat when connected
+  useEffect(() => {
+    if (!ytConnected) return;
+
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        await fetch("/api/youtube/poll");
+        if (cancelled) return;
+        // Refresh entries after polling
+        const r = await fetch("/api/entries");
+        const d = await r.json();
+        if (Array.isArray(d.entries)) setEntries(d.entries);
+      } catch (e) {
+        console.error("Poll failed:", e);
+      }
+    };
+
+    tick(); // run immediately
+    const id = setInterval(tick, 8000); // then every 8 sec
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [ytConnected]);
+
+  // Add entry via API (manual entry is disabled in UI but function stays intact)
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -76,7 +101,7 @@ export default function Home() {
     }
   };
 
-  // Helper: clear entries via API (enabled only when ytConnected via button disabled prop)
+  // Clear entries via API (restricted by ytConnected in UI)
   const clearEntries = async () => {
     try {
       await fetch("/api/entries", { method: "DELETE" });
@@ -88,7 +113,6 @@ export default function Home() {
       console.error("Failed to clear entries:", e);
     }
   };
-  // ====================================================
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -145,7 +169,7 @@ export default function Home() {
         ctx.closePath();
       }
 
-      // Name placement (center along arc radius)
+      // Name placement
       ctx.save();
       ctx.translate(radius, radius);
       ctx.rotate(startAngle + anglePerSlice / 2);
@@ -226,7 +250,7 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-        {/* Left-side text (unchanged) */}
+        {/* Left-side text */}
         <div
           className="subtitle"
           style={{
@@ -246,7 +270,7 @@ export default function Home() {
           1 GIFTED{"\n"}={"\n"}1 Entry
         </div>
 
-        {/* Right-side counter (unchanged) */}
+        {/* Right-side counter */}
         <div
           className="subtitle"
           style={{
@@ -280,7 +304,7 @@ export default function Home() {
           />
         </div>
 
-        {/* Spin button (unchanged) */}
+        {/* Spin button */}
         <div className="controls" style={{ justifyContent: "center" }}>
           <button
             className="spin-btn"
@@ -303,7 +327,7 @@ export default function Home() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addEntry()}
-              disabled // ← disabled as requested
+              disabled
             />
             <input
               type="number"
@@ -312,7 +336,7 @@ export default function Home() {
               value={amount}
               onChange={(e) => setAmount(parseInt(e.target.value))}
               style={{ width: "50px" }}
-              disabled // ← disabled as requested
+              disabled
             />
             <button onClick={addEntry} disabled>
               Add Entry
@@ -323,7 +347,7 @@ export default function Home() {
             className="clear-btn"
             onClick={clearEntries}
             style={{ marginTop: "10px" }}
-            disabled={!ytConnected} // ← only enabled for connected editor
+            disabled={!ytConnected}
             title={
               ytConnected
                 ? "Clear all entries"
@@ -332,10 +356,9 @@ export default function Home() {
           >
             Clear Wheel
           </button>
-          {/* Note: backend also enforces cookie check for DELETE */}
         </div>
 
-        {/* Winner Modal (unchanged) */}
+        {/* Winner Modal */}
         {showWinnerModal && winnerIndex !== null && (
           <div
             style={{

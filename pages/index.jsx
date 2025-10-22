@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"; 
+import React, { useState, useEffect, useRef } from "react";
 
 export default function Home() {
   const [entries, setEntries] = useState([]);
@@ -23,6 +23,56 @@ export default function Home() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // ======= PERSISTENCE (Redis via /api/entries) =======
+  // Load entries on mount
+  useEffect(() => {
+    const loadEntries = async () => {
+      try {
+        const res = await fetch("/api/entries");
+        const data = await res.json();
+        if (Array.isArray(data.entries)) setEntries(data.entries);
+      } catch (e) {
+        console.error("Failed to load entries:", e);
+      }
+    };
+    loadEntries();
+  }, []);
+
+  // Helper: add entry via API
+  const addEntry = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || amount < 1) return;
+    try {
+      const res = await fetch("/api/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, amount: Number(amount) }),
+      });
+      const data = await res.json();
+      if (Array.isArray(data.entries)) {
+        setEntries(data.entries);
+        setName("");
+        setAmount(1);
+      }
+    } catch (e) {
+      console.error("Failed to add entry:", e);
+    }
+  };
+
+  // Helper: clear entries via API
+  const clearEntries = async () => {
+    try {
+      await fetch("/api/entries", { method: "DELETE" });
+      setEntries([]);
+      setWinnerIndex(null);
+      setFlash(false);
+      setShowWinnerModal(false);
+    } catch (e) {
+      console.error("Failed to clear entries:", e);
+    }
+  };
+  // ====================================================
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -60,6 +110,7 @@ export default function Home() {
       const startAngle = i * anglePerSlice;
       const endAngle = startAngle + anglePerSlice;
 
+      // Segment
       ctx.beginPath();
       ctx.moveTo(radius, radius);
       ctx.arc(radius, radius, radius, startAngle, endAngle);
@@ -67,6 +118,7 @@ export default function Home() {
       ctx.fill();
       ctx.closePath();
 
+      // Flashing winner highlight
       if (winnerIndex === i && flash) {
         ctx.beginPath();
         ctx.moveTo(radius, radius);
@@ -77,6 +129,7 @@ export default function Home() {
         ctx.closePath();
       }
 
+      // Name placement (center along arc radius)
       ctx.save();
       ctx.translate(radius, radius);
       ctx.rotate(startAngle + anglePerSlice / 2);
@@ -96,22 +149,6 @@ export default function Home() {
       ctx.restore();
     });
   }, [entries, rotation, winnerIndex, flash]);
-
-  const addEntry = () => {
-    if (!name.trim() || amount < 1) return;
-    const newEntries = [];
-    for (let i = 0; i < amount; i++) newEntries.push(name);
-    setEntries((prev) => [...prev, ...newEntries]);
-    setName("");
-    setAmount(1);
-  };
-
-  const clearEntries = () => {
-    setEntries([]);
-    setWinnerIndex(null);
-    setFlash(false);
-    setShowWinnerModal(false);
-  };
 
   const spinWheel = () => {
     if (entries.length === 0) return alert("No entries to spin!");
@@ -285,10 +322,10 @@ export default function Home() {
                 className="grim-swing"
                 style={{ width: "120px", marginBottom: "20px" }}
               />
-              <h2> Winner! </h2>
+              <h2 style={{ fontSize: "2em" }}>💀 Winner! 💀</h2>
               <p
                 style={{
-                  fontSize: "7.6em",
+                  fontSize: "3.6em",
                   margin: "30px 0",
                   fontFamily: "'Tooth and Nail Regular', Arial, sans-serif",
                   fontWeight: "bold",
@@ -314,42 +351,24 @@ export default function Home() {
 
         <style jsx>{`
           @keyframes swing {
-            0% { transform: rotate(0deg); }
-            50% { transform: rotate(-10deg); }
-            100% { transform: rotate(0deg); }
+            0% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+            100% { transform: rotate(-10deg); }
           }
-
           .grim-swing {
             animation: swing 1.2s ease-in-out infinite;
             transform-origin: top center;
           }
 
           @keyframes popBounce {
-            0% {
-              transform: scale(0);
-              opacity: 0;
-            }
-            60% {
-              transform: scale(1.2);
-              opacity: 1;
-            }
-            100% {
-              transform: scale(1);
-            }
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); }
           }
-
           @keyframes textBounce {
-            0% {
-              transform: scale(0);
-              opacity: 0;
-            }
-            60% {
-              transform: scale(1.3);
-              opacity: 1;
-            }
-            100% {
-              transform: scale(1);
-            }
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(1); }
           }
         `}</style>
 
@@ -360,7 +379,7 @@ export default function Home() {
             marginTop: "20px",
           }}
         >
-          Developed By Shkrimpi - v1.1.2
+          Developed By Shkrimpi
         </footer>
       </div>
     </div>

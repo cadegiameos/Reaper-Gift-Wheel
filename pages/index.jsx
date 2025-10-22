@@ -9,6 +9,7 @@ export default function Home() {
   const [winnerIndex, setWinnerIndex] = useState(null);
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [ytConnected, setYtConnected] = useState(false); // ← added
   const canvasRef = useRef(null);
 
   // Compute scale based on window size
@@ -39,7 +40,21 @@ export default function Home() {
     loadEntries();
   }, []);
 
-  // Helper: add entry via API
+  // Check if YouTube is connected (controls temp button + clear permissions)
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch("/api/check-youtube");
+        const data = await res.json();
+        setYtConnected(!!data.exists);
+      } catch {
+        setYtConnected(false);
+      }
+    };
+    check();
+  }, []);
+
+  // Helper: add entry via API (kept intact; inputs disabled in UI)
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -60,7 +75,7 @@ export default function Home() {
     }
   };
 
-  // Helper: clear entries via API
+  // Helper: clear entries via API (enabled only when ytConnected)
   const clearEntries = async () => {
     try {
       await fetch("/api/entries", { method: "DELETE" });
@@ -180,6 +195,25 @@ export default function Home() {
         height: "1080px",
       }}
     >
+      {/* TEMP YouTube connect button (only if not connected) */}
+      {!ytConnected && (
+        <button
+          onClick={() => (window.location.href = "/api/auth/google")}
+          style={{
+            position: "absolute",
+            top: "20px",
+            right: "20px",
+            padding: "10px 20px",
+            fontSize: "1em",
+            borderRadius: "8px",
+            cursor: "pointer",
+            zIndex: 9999,
+          }}
+        >
+          Connect YouTube (TEMP)
+        </button>
+      )}
+
       <div className="container">
         <h1
           className="title"
@@ -256,7 +290,7 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Manual entry and Clear Wheel button */}
+        {/* Manual entry (VISIBLE but DISABLED) */}
         <div
           className="manual-entry"
           style={{ flexDirection: "column", alignItems: "center" }}
@@ -268,6 +302,7 @@ export default function Home() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addEntry()}
+              disabled // ← disabled as requested
             />
             <input
               type="number"
@@ -276,14 +311,23 @@ export default function Home() {
               value={amount}
               onChange={(e) => setAmount(parseInt(e.target.value))}
               style={{ width: "50px" }}
+              disabled // ← disabled as requested
             />
-            <button onClick={addEntry}>Add Entry</button>
+            <button onClick={addEntry} disabled>
+              Add Entry
+            </button>
           </div>
 
           <button
             className="clear-btn"
             onClick={clearEntries}
             style={{ marginTop: "10px" }}
+            disabled={!ytConnected} // ← only enabled for connected editor
+            title={
+              ytConnected
+                ? "Clear all entries"
+                : "Only the connected YouTube editor can clear the wheel"
+            }
           >
             Clear Wheel
           </button>

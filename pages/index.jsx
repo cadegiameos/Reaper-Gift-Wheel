@@ -9,11 +9,10 @@ export default function Home() {
   const [winnerIndex, setWinnerIndex] = useState(null);
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [ytConnected, setYtConnected] = useState(false); // YouTube connected?
-  
+  const [ytConnected, setYtConnected] = useState(false);
+
   const canvasRef = useRef(null);
 
-  // Compute scale based on window size (unchanged)
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -26,8 +25,6 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ======= PERSISTENCE (Redis via /api/entries) =======
-  // Load entries on mount (unchanged)
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -41,7 +38,6 @@ export default function Home() {
     loadEntries();
   }, []);
 
-  // Check if YouTube is connected (for permissions)
   useEffect(() => {
     const check = async () => {
       try {
@@ -55,7 +51,6 @@ export default function Home() {
     check();
   }, []);
 
-  // Helper: add entry via API
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -76,7 +71,6 @@ export default function Home() {
     }
   };
 
-  // Helper: clear entries via API (only allowed if ytConnected)
   const clearEntries = async () => {
     if (!ytConnected) return;
     try {
@@ -89,7 +83,6 @@ export default function Home() {
       console.error("Failed to clear entries:", e);
     }
   };
-  // ====================================================
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -127,7 +120,6 @@ export default function Home() {
       const startAngle = i * anglePerSlice;
       const endAngle = startAngle + anglePerSlice;
 
-      // Segment
       ctx.beginPath();
       ctx.moveTo(radius, radius);
       ctx.arc(radius, radius, radius, startAngle, endAngle);
@@ -135,7 +127,6 @@ export default function Home() {
       ctx.fill();
       ctx.closePath();
 
-      // Flashing winner highlight
       if (winnerIndex === i && flash) {
         ctx.beginPath();
         ctx.moveTo(radius, radius);
@@ -146,7 +137,6 @@ export default function Home() {
         ctx.closePath();
       }
 
-      // Name placement (center along arc radius)
       ctx.save();
       ctx.translate(radius, radius);
       ctx.rotate(startAngle + anglePerSlice / 2);
@@ -185,7 +175,6 @@ export default function Home() {
     }, 5000);
   };
 
-  // 🧭 Poll YouTube chat every 10 seconds for new gifted memberships
   useEffect(() => {
     if (!ytConnected) return;
     const poll = setInterval(async () => {
@@ -216,68 +205,6 @@ export default function Home() {
         height: "1080px",
       }}
     >
-      {/* TEMP YouTube connect button (only if not connected) */}
-      {!ytConnected && (
-        <button
-          onClick={() => (window.location.href = "/api/auth/google")}
-          style={{
-            position: "absolute",
-            top: "20px",
-            right: "60px", // Moved further right
-            padding: "10px 20px",
-            fontSize: "1em",
-            borderRadius: "8px",
-            cursor: "pointer",
-            zIndex: 9999,
-          }}
-        >
-          Connect YouTube (TEMP)
-        </button>
-      )}
-
-      {/* Small floating notice if not connected */}
-      {!ytConnected && (
-        <div
-          style={{
-            position: "absolute",
-            top: "64px",
-            right: "60px",
-            padding: "8px 12px",
-            background: "rgba(0,0,0,0.6)",
-            color: "#fff",
-            borderRadius: "10px",
-            fontSize: "0.95em",
-            lineHeight: 1.2,
-            zIndex: 9999,
-            backdropFilter: "blur(2px)",
-            pointerEvents: "none",
-          }}
-          aria-live="polite"
-        >
-          Waiting for YouTube editor<br />to connect…
-        </div>
-      )}
-
-      {/* ✅ Green tick in bottom right when connected */}
-      {ytConnected && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "20px",
-            right: "20px",
-            background: "rgba(0,255,0,0.7)",
-            color: "#000",
-            padding: "10px 15px",
-            borderRadius: "50%",
-            fontSize: "1.5em",
-            fontWeight: "bold",
-            zIndex: 9999,
-          }}
-        >
-          ✓
-        </div>
-      )}
-
       <div className="container">
         <h1
           className="title"
@@ -288,6 +215,68 @@ export default function Home() {
         >
           Lolcow Reapers Gifted Member Wheel.
         </h1>
+
+        {/* ▶︎ Connect YouTube Button (Moved under heading) */}
+        {!ytConnected && (
+          <div style={{ position: "absolute", top: "140px", right: "60px" }}>
+            <button
+              onClick={() => (window.location.href = "/api/auth/google")}
+              style={{
+                padding: "12px 28px",
+                fontSize: "1.2em",
+                fontWeight: "bold",
+                color: "#fff",
+                backgroundColor: "#FF0000", // YouTube red
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+                boxShadow: "0px 4px 10px rgba(0,0,0,0.3)",
+              }}
+            >
+              ▶︎ Connect YouTube
+            </button>
+
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "8px 12px",
+                background: "rgba(0,0,0,0.6)",
+                color: "#fff",
+                borderRadius: "8px",
+                fontSize: "0.95em",
+                lineHeight: 1.2,
+                backdropFilter: "blur(2px)",
+                pointerEvents: "none",
+                textAlign: "center",
+              }}
+              aria-live="polite"
+            >
+              Waiting for YouTube editor to connect…
+            </div>
+          </div>
+        )}
+
+        {/* ✅ Green tick bottom-right when connected */}
+        {ytConnected && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "20px",
+              right: "20px",
+              background: "rgba(0,255,0,0.7)",
+              color: "#000",
+              padding: "10px 15px",
+              borderRadius: "50%",
+              fontSize: "1.5em",
+              fontWeight: "bold",
+              zIndex: 9999,
+            }}
+          >
+            ✓
+          </div>
+        )}
+
+        {/* Rest of your unchanged code continues below... (omitted for brevity but already included above) */}
 
         {/* Left-side text */}
         <div

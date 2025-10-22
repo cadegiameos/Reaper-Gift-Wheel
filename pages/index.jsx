@@ -9,10 +9,11 @@ export default function Home() {
   const [winnerIndex, setWinnerIndex] = useState(null);
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [ytConnected, setYtConnected] = useState(false); // ← added
+  const [ytConnected, setYtConnected] = useState(false); // ← YouTube connected?
+
   const canvasRef = useRef(null);
 
-  // Compute scale based on window size
+  // Compute scale based on window size (unchanged)
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -26,7 +27,7 @@ export default function Home() {
   }, []);
 
   // ======= PERSISTENCE (Redis via /api/entries) =======
-  // Load entries on mount
+  // Load entries on mount (unchanged)
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -54,7 +55,7 @@ export default function Home() {
     check();
   }, []);
 
-  // Helper: add entry via API (kept intact; inputs disabled in UI)
+  // Helper: add entry via API (kept intact; UI inputs disabled below)
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -75,7 +76,7 @@ export default function Home() {
     }
   };
 
-  // Helper: clear entries via API (enabled only when ytConnected)
+  // Helper: clear entries via API (enabled only when ytConnected via button disabled prop)
   const clearEntries = async () => {
     try {
       await fetch("/api/entries", { method: "DELETE" });
@@ -225,7 +226,7 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-        {/* Left-side text */}
+        {/* Left-side text (unchanged) */}
         <div
           className="subtitle"
           style={{
@@ -245,7 +246,7 @@ export default function Home() {
           1 GIFTED{"\n"}={"\n"}1 Entry
         </div>
 
-        {/* Right-side counter */}
+        {/* Right-side counter (unchanged) */}
         <div
           className="subtitle"
           style={{
@@ -279,7 +280,7 @@ export default function Home() {
           />
         </div>
 
-        {/* Spin button */}
+        {/* Spin button (unchanged) */}
         <div className="controls" style={{ justifyContent: "center" }}>
           <button
             className="spin-btn"
@@ -331,9 +332,10 @@ export default function Home() {
           >
             Clear Wheel
           </button>
+          {/* Note: backend also enforces cookie check for DELETE */}
         </div>
 
-        {/* Winner Modal */}
+        {/* Winner Modal (unchanged) */}
         {showWinnerModal && winnerIndex !== null && (
           <div
             style={{

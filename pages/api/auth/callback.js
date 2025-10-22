@@ -26,15 +26,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No refresh token returned" });
     }
 
-    // Save refresh token to Redis
+    // ✅ Save refresh token in Redis
     await redis.set("YT_REFRESH_TOKEN", data.refresh_token);
 
-    // Set an HttpOnly cookie so only the connected editor can clear
+    // ✅ Set secure HttpOnly cookie so ONLY the editor can clear wheel later
     res.setHeader("Set-Cookie", [
-      // 30 days
-      `yt_editor=1; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
+      `yt_editor=1; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${
+        30 * 24 * 60 * 60
+      }`, // valid for 30 days
     ]);
 
+    // ✅ Redirect editor back to main page
     return res.redirect("/?connected=youtube");
   } catch (err) {
     console.error(err);

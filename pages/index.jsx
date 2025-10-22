@@ -10,10 +10,10 @@ export default function Home() {
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [ytConnected, setYtConnected] = useState(false); // YouTube connected?
-
+  
   const canvasRef = useRef(null);
 
-  // Compute scale based on window size
+  // Compute scale based on window size (unchanged)
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -26,7 +26,8 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load entries on mount
+  // ======= PERSISTENCE (Redis via /api/entries) =======
+  // Load entries on mount (unchanged)
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -40,7 +41,7 @@ export default function Home() {
     loadEntries();
   }, []);
 
-  // Check if YouTube is connected 
+  // Check if YouTube is connected (for permissions)
   useEffect(() => {
     const check = async () => {
       try {
@@ -54,33 +55,7 @@ export default function Home() {
     check();
   }, []);
 
-  // Auto-poll YouTube live chat when connected
-  useEffect(() => {
-    if (!ytConnected) return;
-
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        await fetch("/api/youtube/poll");
-        if (cancelled) return;
-        // Refresh entries after polling
-        const r = await fetch("/api/entries");
-        const d = await r.json();
-        if (Array.isArray(d.entries)) setEntries(d.entries);
-      } catch (e) {
-        console.error("Poll failed:", e);
-      }
-    };
-
-    tick(); // run immediately
-    const id = setInterval(tick, 8000); // then every 8 sec
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [ytConnected]);
-
-  // Add entry via API (manual entry is disabled in UI but function stays intact)
+  // Helper: add entry via API
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -101,8 +76,9 @@ export default function Home() {
     }
   };
 
-  // Clear entries via API (restricted by ytConnected in UI)
+  // Helper: clear entries via API (only allowed if ytConnected)
   const clearEntries = async () => {
+    if (!ytConnected) return;
     try {
       await fetch("/api/entries", { method: "DELETE" });
       setEntries([]);
@@ -113,6 +89,7 @@ export default function Home() {
       console.error("Failed to clear entries:", e);
     }
   };
+  // ====================================================
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -169,7 +146,7 @@ export default function Home() {
         ctx.closePath();
       }
 
-      // Name placement
+      // Name placement (center along arc radius)
       ctx.save();
       ctx.translate(radius, radius);
       ctx.rotate(startAngle + anglePerSlice / 2);
@@ -207,6 +184,8 @@ export default function Home() {
       setShowWinnerModal(true);
     }, 5000);
   };
+
+  // --- Placeholder for YouTube polling (coming next) ---
 
   return (
     <div
@@ -315,7 +294,7 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Manual entry (VISIBLE but DISABLED) */}
+        {/* Manual entry (visible but disabled) */}
         <div
           className="manual-entry"
           style={{ flexDirection: "column", alignItems: "center" }}
@@ -434,6 +413,7 @@ export default function Home() {
             60% { transform: scale(1.2); opacity: 1; }
             100% { transform: scale(1); }
           }
+
           @keyframes textBounce {
             0% { transform: scale(0); opacity: 0; }
             60% { transform: scale(1.3); opacity: 1; }

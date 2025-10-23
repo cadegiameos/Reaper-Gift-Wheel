@@ -1,3 +1,4 @@
+// /api/check-youtube.js
 import { Redis } from "@upstash/redis";
 
 const redis = new Redis({
@@ -7,14 +8,20 @@ const redis = new Redis({
 
 export default async function handler(req, res) {
   try {
-    const token = await redis.get("yt_access_token");
-    if (token) {
-      return res.status(200).json({ exists: true });
-    } else {
-      return res.status(200).json({ exists: false });
-    }
+    // Get stored YouTube credentials from Redis
+    const accessToken = await redis.get("yt_access_token");
+    const channelId = await redis.get("yt_channel_id");
+
+    // ✅ Only fully connected when both exist
+    const fullyConnected = !!accessToken && !!channelId;
+
+    return res.status(200).json({
+      accessTokenExists: !!accessToken,
+      channelIdExists: !!channelId,
+      exists: fullyConnected, // Frontend checks this for the green tick
+    });
   } catch (err) {
-    console.error("check-youtube error:", err);
+    console.error("Error checking YouTube:", err);
     return res.status(500).json({ exists: false, error: err.message });
   }
 }

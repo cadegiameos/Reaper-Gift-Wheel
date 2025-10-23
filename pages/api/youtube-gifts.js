@@ -8,37 +8,35 @@ const redis = new Redis({
 
 export default async function handler(req, res) {
   try {
-    // ✅ 1) Check for YouTube token
-    const access_token = await redis.get("yt_access_token");
-    if (!access_token) {
-      return res.status(200).json({
-        connected: false,
-        added: 0,
-        details: [],
-      });
+    // ✅ Get stored access token & selected channel ID
+    const accessToken = await redis.get("yt_access_token");
+    const channelId = await redis.get("yt_channel_id");
+
+    if (!accessToken || !channelId) {
+      return res.status(401).json({ added: 0, message: "YouTube not fully connected" });
     }
 
-    // ✅ 2) Continue YouTube logic IF token exists
+    // ✅ Use the correct auth
     const youtube = google.youtube({
       version: "v3",
-      auth: access_token,
+      auth: accessToken,
     });
 
-    // 🟢 Get active live chat ID
+    // ✅ Get ACTIVE live stream for the specific selected channel
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
-      mine: true,
+      broadcastType: "all",
+      channelId, // 👈 ONLY check chosen channel
     });
 
-    if (!broadcasts.data.items?.length)
-      return res
-        .status(404)
-        .json({ message: "No active live stream found" });
+    if (!broadcasts.data.items?.length) {
+      return res.status(404).json({ added: 0, message: "No active live stream found" });
+    }
 
     const liveChatId = broadcasts.data.items[0].snippet.liveChatId;
 
-    // 🟢 Get recent live chat messages
+    // ✅ Fetch latest messages
     const chat = await youtube.liveChatMessages.list({
       liveChatId,
       part: "snippet,authorDetails",
@@ -46,36 +44,27 @@ export default async function handler(req, res) {
     });
 
     const messages = chat.data.items || [];
+    let totalAdded = 0;
 
-    // 🟢 Detect gifted membership messages
-    let newEntries = [];
     for (const msg of messages) {
       const text = msg.snippet.displayMessage || "";
       const author = msg.authorDetails.displayName || "Unknown";
 
-      // Match messages like: "John gifted 5 memberships!"
       const match = text.match(/gifted\s+(\d+)\s+member/i);
       if (match) {
         const amount = parseInt(match[1], 10);
         if (amount > 0) {
           const existing = (await redis.get("wheelEntries")) || [];
-          const updated = [...existing, ...Array(amount).fill(author)];
-          await redis.set("wheelEntries", updated);
-          newEntries.push({ author, amount });
+          const newEntries = [...existing, ...Array(amount).fill(author)];
+          await redis.set("wheelEntries", newEntries);
+          totalAdded += amount;
         }
       }
     }
 
-    return res.status(200).json({
-      connected: true,
-      message: "Checked chat and added entries",
-      added: newEntries.length,
-      details: newEntries,
-    });
+    return res.status(200).json({ added: totalAdded });
   } catch (err) {
     console.error("YouTube gifts error:", err);
-    return res
-      .status(500)
-      .json({ error: err.message, stack: err.stack || "No stack" });
+    return res.status(500).json({ error: err.message });
   }
 }

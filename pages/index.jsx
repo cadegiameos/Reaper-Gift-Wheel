@@ -13,6 +13,7 @@ export default function Home() {
 
   const canvasRef = useRef(null);
 
+  // Compute scale based on window size (unchanged)
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -25,6 +26,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Load entries from Redis
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -38,52 +40,39 @@ export default function Home() {
     loadEntries();
   }, []);
 
+  // ✅ Check if YouTube is FULLY connected (token + channel ID must exist)
   useEffect(() => {
     const check = async () => {
       try {
         const res = await fetch("/api/check-youtube");
         const data = await res.json();
-        setYtConnected(!!data.exists);
+        setYtConnected(data.accessTokenExists && data.channelIdExists);
       } catch {
         setYtConnected(false);
       }
     };
     check();
   }, []);
-
-  const addEntry = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || amount < 1) return;
-    try {
-      const res = await fetch("/api/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, amount: Number(amount) }),
-      });
-      const data = await res.json();
-      if (Array.isArray(data.entries)) {
-        setEntries(data.entries);
-        setName("");
-        setAmount(1);
-      }
-    } catch (e) {
-      console.error("Failed to add entry:", e);
-    }
-  };
-
-  const clearEntries = async () => {
+  // Poll YouTube every 10s for new gifted memberships (only if fully connected)
+  useEffect(() => {
     if (!ytConnected) return;
-    try {
-      await fetch("/api/entries", { method: "DELETE" });
-      setEntries([]);
-      setWinnerIndex(null);
-      setFlash(false);
-      setShowWinnerModal(false);
-    } catch (e) {
-      console.error("Failed to clear entries:", e);
-    }
-  };
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch("/api/youtube-gifts");
+        const data = await res.json();
+        if (data.added > 0) {
+          const entriesRes = await fetch("/api/entries");
+          const updated = await entriesRes.json();
+          if (Array.isArray(updated.entries)) setEntries(updated.entries);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000);
+    return () => clearInterval(poll);
+  }, [ytConnected]);
 
+  // Wheel rotation animation
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isSpinning) setRotation((prev) => (prev + 0.1) % 360);
@@ -91,6 +80,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isSpinning]);
 
+  // Flash effect for winner slice
   useEffect(() => {
     if (winnerIndex !== null) {
       const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
@@ -98,6 +88,7 @@ export default function Home() {
     }
   }, [winnerIndex]);
 
+  // Drawing the wheel
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -174,25 +165,6 @@ export default function Home() {
       setShowWinnerModal(true);
     }, 5000);
   };
-
-  useEffect(() => {
-    if (!ytConnected) return;
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch("/api/youtube-gifts");
-        const data = await res.json();
-        if (data.added > 0) {
-          const entriesRes = await fetch("/api/entries");
-          const updated = await entriesRes.json();
-          if (Array.isArray(updated.entries)) setEntries(updated.entries);
-        }
-      } catch (err) {
-        console.error("Polling error:", err);
-      }
-    }, 10000);
-    return () => clearInterval(poll);
-  }, [ytConnected]);
-
   return (
     <div
       className="scale-wrapper"
@@ -206,6 +178,7 @@ export default function Home() {
       }}
     >
       <div className="container">
+        {/* Heading */}
         <h1
           className="title"
           style={{
@@ -216,14 +189,14 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-        {/* ▶︎ Connect YouTube Button (Moved under heading) */}
+        {/* ▶︎ Connect YouTube Button (beneath heading, aligned right) */}
         {!ytConnected && (
-          <div style={{ position: "absolute", top: "140px", right: "60px" }}>
+          <div style={{ position: "absolute", top: "180px", right: "100px" }}>
             <button
               onClick={() => (window.location.href = "/api/auth/google")}
               style={{
-                padding: "12px 28px",
-                fontSize: "1.2em",
+                padding: "14px 32px",
+                fontSize: "1.3em",
                 fontWeight: "bold",
                 color: "#fff",
                 backgroundColor: "#FF0000", // YouTube red
@@ -235,28 +208,10 @@ export default function Home() {
             >
               ▶︎ Connect YouTube
             </button>
-
-            <div
-              style={{
-                marginTop: "10px",
-                padding: "8px 12px",
-                background: "rgba(0,0,0,0.6)",
-                color: "#fff",
-                borderRadius: "8px",
-                fontSize: "0.95em",
-                lineHeight: 1.2,
-                backdropFilter: "blur(2px)",
-                pointerEvents: "none",
-                textAlign: "center",
-              }}
-              aria-live="polite"
-            >
-              Waiting for YouTube editor to connect…
-            </div>
           </div>
         )}
 
-        {/* ✅ Green tick bottom-right when connected */}
+        {/* ✅ Green tick bottom-right when fully connected */}
         {ytConnected && (
           <div
             style={{
@@ -275,8 +230,6 @@ export default function Home() {
             ✓
           </div>
         )}
-
-        {/* Rest of your unchanged code continues below... (omitted for brevity but already included above) */}
 
         {/* Left-side text */}
         <div
@@ -319,6 +272,7 @@ export default function Home() {
           {entries.length}
         </div>
 
+        {/* WHEEL */}
         <div className="wheel-container">
           <canvas
             ref={canvasRef}
@@ -349,26 +303,9 @@ export default function Home() {
           style={{ flexDirection: "column", alignItems: "center" }}
         >
           <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-            <input
-              type="text"
-              placeholder="Enter name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addEntry()}
-              disabled
-            />
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={amount}
-              onChange={(e) => setAmount(parseInt(e.target.value))}
-              style={{ width: "50px" }}
-              disabled
-            />
-            <button onClick={addEntry} disabled>
-              Add Entry
-            </button>
+            <input type="text" disabled />
+            <input type="number" style={{ width: "50px" }} disabled />
+            <button disabled>Add Entry</button>
           </div>
 
           <button
@@ -385,7 +322,6 @@ export default function Home() {
             Clear Wheel
           </button>
         </div>
-
         {/* Winner Modal */}
         {showWinnerModal && winnerIndex !== null && (
           <div
@@ -477,7 +413,7 @@ export default function Home() {
             marginTop: "20px",
           }}
         >
-          Developed By Shkrimpi - v1.1.2
+          Developed By Shkrimpi - v1.1.3
         </footer>
       </div>
     </div>

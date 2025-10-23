@@ -16,8 +16,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Missing channelId" });
   }
 
-  try:
-    // Save chosen channel to Redis
+  try {
+    // ✅ Save chosen channel to Redis
     await redis.set("yt_channel_id", channelId);
 
     return res.status(200).json({ message: "Channel saved successfully" });

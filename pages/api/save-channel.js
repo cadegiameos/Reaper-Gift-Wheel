@@ -1,3 +1,4 @@
+// pages/api/save-channel.js
 import { Redis } from "@upstash/redis";
 
 const redis = new Redis({
@@ -10,15 +11,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const { channelId } = req.body;
-
-  if (!channelId) {
-    return res.status(400).json({ message: "Missing channelId" });
-  }
-
   try {
-    // ✅ Save chosen channel to Redis
+    const { channelId, channelTitle } = req.body;
+
+    if (!channelId) {
+      return res.status(400).json({ message: "Missing channelId" });
+    }
+
+    // ✅ Save to Redis
     await redis.set("yt_channel_id", channelId);
+    if (channelTitle) {
+      await redis.set("yt_channel_title", channelTitle);
+    }
 
     return res.status(200).json({ message: "Channel saved successfully" });
   } catch (err) {

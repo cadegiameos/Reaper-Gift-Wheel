@@ -23,17 +23,18 @@ export default function ConnectedSuccess() {
     fetchChannels();
   }, []);
 
-  // ✅ Save chosen channelId AND channelTitle
+  // When a channel is clicked → save it
   const handleSelectChannel = async (channelId, channelTitle) => {
     setSaving(true);
     try {
-      const res = await fetch("/api/set-channel", {
+      const res = await fetch("/api/save-channel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channelId, channelTitle }),
       });
 
       if (res.ok) {
+        // Redirect back home once saved
         window.location.href = "/";
       } else {
         alert("Failed to save channel. Try again.");
@@ -61,19 +62,22 @@ export default function ConnectedSuccess() {
       }}
     >
       <h1 style={{ marginBottom: "10px" }}>✅ YouTube Connected!</h1>
-      <p style={{ marginBottom: "30px" }}>
-        Select the channel you want to use for membership detection:
+      <p style={{ marginBottom: "4px", opacity: 0.9 }}>
+        Select the channel you want to monitor for gifted memberships.
+      </p>
+      <p style={{ marginBottom: "30px", opacity: 0.7 }}>
+        You can change this later by reconnecting.
       </p>
 
       {loading ? (
         <p>Loading channels...</p>
       ) : channels.length === 0 ? (
-        <p>No channels found. Are you sure this account can manage channels?</p>
+        <p>No channels found. Make sure this Google account can manage channels.</p>
       ) : (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: "20px",
             width: "80%",
             maxWidth: "900px",
@@ -88,9 +92,9 @@ export default function ConnectedSuccess() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                background: "#222",
+                background: "#1e1e1e",
                 padding: "20px",
-                borderRadius: "10px",
+                borderRadius: "12px",
                 cursor: "pointer",
                 border: "1px solid #333",
                 transition: "0.2s",
@@ -117,10 +121,17 @@ export default function ConnectedSuccess() {
               <span style={{ fontSize: "1.1em", fontWeight: "bold" }}>
                 {ch.title}
               </span>
+              <span style={{ fontSize: "0.85em", opacity: 0.7, marginTop: "6px" }}>
+                Click to select
+              </span>
             </button>
           ))}
         </div>
       )}
+
+      <div style={{ marginTop: "30px", opacity: 0.7 }}>
+        {saving ? "Saving…" : "Once selected, you’ll be sent back to the wheel."}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+// pages/api/entries.js
 import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
         ...existing,
         ...Array(Number(amount)).fill(String(name)),
       ];
+
       await redis.set("wheelEntries", newEntries);
       return res.status(200).json({ entries: newEntries });
     } catch (e) {
@@ -48,7 +50,10 @@ export default async function handler(req, res) {
         });
       }
 
+      // ✅ Clear entries AND previously processed messages so new live events are detected
       await redis.del("wheelEntries");
+      await redis.del("processedGiftIds"); // 🔥 Important so new gifts aren't ignored
+
       return res.status(200).json({ message: "Entries cleared" });
     } catch (e) {
       return res.status(500).json({ message: "Failed to clear" });

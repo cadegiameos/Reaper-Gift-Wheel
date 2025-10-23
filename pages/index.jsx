@@ -13,7 +13,7 @@ export default function Home() {
 
   const canvasRef = useRef(null);
 
-  // Compute scale based on window size
+  // Track scale for resizing
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -44,7 +44,7 @@ export default function Home() {
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await fetch("/api/check-youtube");
+        const res = await fetch("/api/check-youtube", { cache: "no-store" });
         const data = await res.json();
         setYtConnected(!!data.exists);
       } catch {
@@ -53,8 +53,7 @@ export default function Home() {
     };
     check();
   }, []);
-
-  // Add entry
+  // Add entry manually (disabled unless unlocked in future)
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -75,7 +74,7 @@ export default function Home() {
     }
   };
 
-  // Clear entries
+  // Clear entries (only if connected)
   const clearEntries = async () => {
     if (!ytConnected) return;
     try {
@@ -89,7 +88,7 @@ export default function Home() {
     }
   };
 
-  // Spinning animation
+  // Default spin rotation animation
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isSpinning) setRotation((prev) => (prev + 0.1) % 360);
@@ -97,7 +96,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isSpinning]);
 
-  // Flash effect
+  // Flash effect on winner
   useEffect(() => {
     if (winnerIndex !== null) {
       const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
@@ -105,66 +104,7 @@ export default function Home() {
     }
   }, [winnerIndex]);
 
-  // Draw wheel
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const size = canvas.width;
-    const radius = size / 2;
-    ctx.clearRect(0, 0, size, size);
-
-    if (entries.length === 0) {
-      ctx.fillStyle = "white";
-      ctx.font = "20px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("No entries yet", radius, radius);
-      return;
-    }
-
-    const anglePerSlice = (2 * Math.PI) / entries.length;
-
-    entries.forEach((entry, i) => {
-      const startAngle = i * anglePerSlice;
-      const endAngle = startAngle + anglePerSlice;
-
-      ctx.beginPath();
-      ctx.moveTo(radius, radius);
-      ctx.arc(radius, radius, radius, startAngle, endAngle);
-      ctx.fillStyle = `hsl(${(i * 360) / entries.length}, 70%, 85%)`;
-      ctx.fill();
-      ctx.closePath();
-
-      if (winnerIndex === i && flash) {
-        ctx.beginPath();
-        ctx.moveTo(radius, radius);
-        ctx.arc(radius, radius, radius, startAngle, endAngle);
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 6;
-        ctx.stroke();
-        ctx.closePath();
-      }
-
-      ctx.save();
-      ctx.translate(radius, radius);
-      ctx.rotate(startAngle + anglePerSlice / 2);
-
-      const sliceWidth = radius * anglePerSlice;
-      let fontSize = Math.min(40, sliceWidth / entry.length);
-      fontSize = Math.max(fontSize, 10);
-      ctx.font = `bold ${fontSize}px Arial`;
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#000";
-
-      const textRadius = radius * 0.6;
-      ctx.fillText(entry, textRadius, 0);
-
-      ctx.restore();
-    });
-  }, [entries, rotation, winnerIndex, flash]);
-
+  // Spin logic
   const spinWheel = () => {
     if (entries.length === 0) return alert("No entries to spin!");
     setIsSpinning(true);
@@ -183,6 +123,24 @@ export default function Home() {
     }, 5000);
   };
 
+  // Poll YouTube gifts (ONLY when fully connected)
+  useEffect(() => {
+    if (!ytConnected) return;
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch("/api/youtube-gifts");
+        const data = await res.json();
+        if (data.added > 0) {
+          const entriesRes = await fetch("/api/entries");
+          const updated = await entriesRes.json();
+          if (Array.isArray(updated.entries)) setEntries(updated.entries);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000);
+    return () => clearInterval(poll);
+  }, [ytConnected]);
   return (
     <div
       className="scale-wrapper"
@@ -196,6 +154,7 @@ export default function Home() {
       }}
     >
       <div className="container">
+        {/* Title */}
         <h1
           className="title"
           style={{
@@ -206,7 +165,7 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-        {/* ✅ Green tick shown when connected */}
+        {/* ✅ Green tick bottom-right when fully connected */}
         {ytConnected && (
           <div
             style={{
@@ -226,7 +185,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ▶︎ Connect YouTube button */}
+        {/* ▶ Connect YouTube button if not connected */}
         {!ytConnected && (
           <div style={{ position: "absolute", top: "140px", right: "60px" }}>
             <button
@@ -236,7 +195,7 @@ export default function Home() {
                 fontSize: "1.2em",
                 fontWeight: "bold",
                 color: "#fff",
-                backgroundColor: "#FF0000",
+                backgroundColor: "#FF0000", // YouTube red
                 border: "none",
                 borderRadius: "10px",
                 cursor: "pointer",
@@ -245,11 +204,25 @@ export default function Home() {
             >
               ▶︎ Connect YouTube
             </button>
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "8px 12px",
+                background: "rgba(0,0,0,0.6)",
+                color: "#fff",
+                borderRadius: "8px",
+                fontSize: "0.95em",
+                lineHeight: 1.2,
+                backdropFilter: "blur(2px)",
+                pointerEvents: "none",
+                textAlign: "center",
+              }}
+              aria-live="polite"
+            >
+              Waiting for YouTube editor to connect…
+            </div>
           </div>
         )}
-
-        {/* Rest of UI remains unchanged (Spinner, manual input, modal, footer, etc.) */}
-        {/* <...FULL EXISTING WHEEL UI CODE CONTINUES BELOW...> */}
         {/* Left-side text */}
         <div
           className="subtitle"
@@ -291,6 +264,7 @@ export default function Home() {
           {entries.length}
         </div>
 
+        {/* Wheel */}
         <div className="wheel-container">
           <canvas
             ref={canvasRef}
@@ -357,7 +331,6 @@ export default function Home() {
             Clear Wheel
           </button>
         </div>
-
         {/* Winner Modal */}
         {showWinnerModal && winnerIndex !== null && (
           <div

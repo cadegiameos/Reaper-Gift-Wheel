@@ -1,3 +1,4 @@
+// pages/api/youtube-gifts.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
@@ -8,35 +9,45 @@ const redis = new Redis({
 
 export default async function handler(req, res) {
   try {
-    // ✅ Get stored access token & selected channel ID
-    const accessToken = await redis.get("yt_access_token");
+    const access_token = await redis.get("yt_access_token");
     const channelId = await redis.get("yt_channel_id");
 
-    if (!accessToken || !channelId) {
-      return res.status(401).json({ added: 0, message: "YouTube not fully connected" });
+    if (!access_token) {
+      return res.status(401).json({ message: "Not connected to YouTube" });
+    }
+    if (!channelId) {
+      return res.status(400).json({ message: "No channel selected" });
     }
 
-    // ✅ Use the correct auth
     const youtube = google.youtube({
       version: "v3",
-      auth: accessToken,
+      auth: access_token,
     });
 
-    // ✅ Get ACTIVE live stream for the specific selected channel
+    // ✅ Fetch active live streams from the chosen channel only
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
-      broadcastType: "all",
-      channelId, // 👈 ONLY check chosen channel
+      maxResults: 50,
+      mine: true,
     });
 
-    if (!broadcasts.data.items?.length) {
-      return res.status(404).json({ added: 0, message: "No active live stream found" });
+    const items = broadcasts.data.items || [];
+    const activeForChosenChannel = items.find(
+      (b) => b?.snippet?.channelId === channelId && b?.snippet?.liveChatId
+    );
+
+    if (!activeForChosenChannel) {
+      return res.status(200).json({
+        message: "No active live stream found for selected channel",
+        added: 0,
+        newEntries: [],
+      });
     }
 
-    const liveChatId = broadcasts.data.items[0].snippet.liveChatId;
+    const liveChatId = activeForChosenChannel.snippet.liveChatId;
 
-    // ✅ Fetch latest messages
+    // ✅ Load chat messages
     const chat = await youtube.liveChatMessages.list({
       liveChatId,
       part: "snippet,authorDetails",
@@ -44,27 +55,49 @@ export default async function handler(req, res) {
     });
 
     const messages = chat.data.items || [];
-    let totalAdded = 0;
+    let newEntries = [];
+
+    // ✅ Retrieve processed gift IDs (avoid duplicates)
+    const processedGiftIds =
+      (await redis.get("processedGiftIds")) || [];
 
     for (const msg of messages) {
-      const text = msg.snippet.displayMessage || "";
-      const author = msg.authorDetails.displayName || "Unknown";
+      const text = msg?.snippet?.displayMessage || "";
+      const author = msg?.authorDetails?.displayName || "Unknown";
+      const messageId = msg?.id;
 
+      // 🎯 Only match "gifted" messages
       const match = text.match(/gifted\s+(\d+)\s+member/i);
-      if (match) {
+      if (match && messageId && !processedGiftIds.includes(messageId)) {
         const amount = parseInt(match[1], 10);
         if (amount > 0) {
           const existing = (await redis.get("wheelEntries")) || [];
-          const newEntries = [...existing, ...Array(amount).fill(author)];
-          await redis.set("wheelEntries", newEntries);
-          totalAdded += amount;
+          const updated = [...existing, ...Array(amount).fill(author)];
+          await redis.set("wheelEntries", updated);
+
+          // ✅ Mark this message as processed
+          processedGiftIds.push(messageId);
+          newEntries.push({ name: author, amount });
         }
       }
     }
 
-    return res.status(200).json({ added: totalAdded });
+    // ✅ Keep only the last 500 processed IDs (avoid bloating Redis)
+    if (processedGiftIds.length > 500) {
+      processedGiftIds.splice(0, processedGiftIds.length - 500);
+    }
+
+    await redis.set("processedGiftIds", processedGiftIds);
+
+    return res.status(200).json({
+      message: "Checked chat and added entries",
+      added: newEntries.length,
+      newEntries,
+    });
   } catch (err) {
-    console.error("YouTube gifts error:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("youtube-gifts error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message, stack: err.stack || "No stack" });
   }
 }

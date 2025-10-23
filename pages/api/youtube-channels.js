@@ -1,3 +1,4 @@
+// pages/api/youtube-channels.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
@@ -8,34 +9,37 @@ const redis = new Redis({
 
 export default async function handler(req, res) {
   try {
-    const accessToken = await redis.get("yt_access_token");
-
-    if (!accessToken) {
-      return res.status(401).json({ message: "Not authenticated with YouTube" });
+    const access_token = await redis.get("yt_access_token");
+    if (!access_token) {
+      return res.status(401).json({ message: "Not connected to YouTube", channels: [] });
     }
 
     const youtube = google.youtube({
       version: "v3",
-      auth: accessToken,
+      auth: access_token,
     });
 
-    // Get channels managed by the signed-in user
+    // Channels owned/managed by this Google account
     const resp = await youtube.channels.list({
-      part: "id,snippet",
-      mine: true, // Only channels they own or manage (editor-level counts)
+      part: "snippet",
+      mine: true,
+      maxResults: 50,
     });
 
-    const items = resp.data.items || [];
-
-    const channels = items.map((ch) => ({
-      id: ch.id,
-      title: ch.snippet.title,
-      thumbnail: ch.snippet.thumbnails?.default?.url || null,
-    }));
+    const channels =
+      (resp.data.items || []).map((ch) => ({
+        id: ch.id,
+        title: ch.snippet?.title || "Untitled",
+        thumbnail:
+          ch.snippet?.thumbnails?.default?.url ||
+          ch.snippet?.thumbnails?.high?.url ||
+          ch.snippet?.thumbnails?.medium?.url ||
+          null,
+      })) || [];
 
     return res.status(200).json({ channels });
   } catch (err) {
-    console.error("Error fetching YouTube channels:", err);
-    return res.status(500).json({ message: "Failed to fetch channels" });
+    console.error("youtube-channels error:", err);
+    return res.status(500).json({ message: "Failed to load channels", channels: [] });
   }
 }

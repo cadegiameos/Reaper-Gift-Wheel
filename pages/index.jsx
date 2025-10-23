@@ -13,7 +13,7 @@ export default function Home() {
 
   const canvasRef = useRef(null);
 
-  // Compute scale based on window size (unchanged)
+  // Compute scale based on window size
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -26,7 +26,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load entries from Redis
+  // Load entries on mount
   useEffect(() => {
     const loadEntries = async () => {
       try {
@@ -40,39 +40,56 @@ export default function Home() {
     loadEntries();
   }, []);
 
-  // ✅ Check if YouTube is FULLY connected (token + channel ID must exist)
+  // Check if fully connected (token + channel)
   useEffect(() => {
     const check = async () => {
       try {
         const res = await fetch("/api/check-youtube");
         const data = await res.json();
-        setYtConnected(data.accessTokenExists && data.channelIdExists);
+        setYtConnected(!!data.exists);
       } catch {
         setYtConnected(false);
       }
     };
     check();
   }, []);
-  // Poll YouTube every 10s for new gifted memberships (only if fully connected)
-  useEffect(() => {
-    if (!ytConnected) return;
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch("/api/youtube-gifts");
-        const data = await res.json();
-        if (data.added > 0) {
-          const entriesRes = await fetch("/api/entries");
-          const updated = await entriesRes.json();
-          if (Array.isArray(updated.entries)) setEntries(updated.entries);
-        }
-      } catch (err) {
-        console.error("Polling error:", err);
-      }
-    }, 10000);
-    return () => clearInterval(poll);
-  }, [ytConnected]);
 
-  // Wheel rotation animation
+  // Add entry
+  const addEntry = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || amount < 1) return;
+    try {
+      const res = await fetch("/api/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, amount: Number(amount) }),
+      });
+      const data = await res.json();
+      if (Array.isArray(data.entries)) {
+        setEntries(data.entries);
+        setName("");
+        setAmount(1);
+      }
+    } catch (e) {
+      console.error("Failed to add entry:", e);
+    }
+  };
+
+  // Clear entries
+  const clearEntries = async () => {
+    if (!ytConnected) return;
+    try {
+      await fetch("/api/entries", { method: "DELETE" });
+      setEntries([]);
+      setWinnerIndex(null);
+      setFlash(false);
+      setShowWinnerModal(false);
+    } catch (e) {
+      console.error("Failed to clear entries:", e);
+    }
+  };
+
+  // Spinning animation
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isSpinning) setRotation((prev) => (prev + 0.1) % 360);
@@ -80,7 +97,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isSpinning]);
 
-  // Flash effect for winner slice
+  // Flash effect
   useEffect(() => {
     if (winnerIndex !== null) {
       const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
@@ -88,7 +105,7 @@ export default function Home() {
     }
   }, [winnerIndex]);
 
-  // Drawing the wheel
+  // Draw wheel
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -165,6 +182,7 @@ export default function Home() {
       setShowWinnerModal(true);
     }, 5000);
   };
+
   return (
     <div
       className="scale-wrapper"
@@ -178,7 +196,6 @@ export default function Home() {
       }}
     >
       <div className="container">
-        {/* Heading */}
         <h1
           className="title"
           style={{
@@ -189,29 +206,7 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-        {/* ▶︎ Connect YouTube Button (beneath heading, aligned right) */}
-        {!ytConnected && (
-          <div style={{ position: "absolute", top: "180px", right: "100px" }}>
-            <button
-              onClick={() => (window.location.href = "/api/auth/google")}
-              style={{
-                padding: "14px 32px",
-                fontSize: "1.3em",
-                fontWeight: "bold",
-                color: "#fff",
-                backgroundColor: "#FF0000", // YouTube red
-                border: "none",
-                borderRadius: "10px",
-                cursor: "pointer",
-                boxShadow: "0px 4px 10px rgba(0,0,0,0.3)",
-              }}
-            >
-              ▶︎ Connect YouTube
-            </button>
-          </div>
-        )}
-
-        {/* ✅ Green tick bottom-right when fully connected */}
+        {/* ✅ Green tick shown when connected */}
         {ytConnected && (
           <div
             style={{
@@ -231,6 +226,30 @@ export default function Home() {
           </div>
         )}
 
+        {/* ▶︎ Connect YouTube button */}
+        {!ytConnected && (
+          <div style={{ position: "absolute", top: "140px", right: "60px" }}>
+            <button
+              onClick={() => (window.location.href = "/api/auth/google")}
+              style={{
+                padding: "12px 28px",
+                fontSize: "1.2em",
+                fontWeight: "bold",
+                color: "#fff",
+                backgroundColor: "#FF0000",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+                boxShadow: "0px 4px 10px rgba(0,0,0,0.3)",
+              }}
+            >
+              ▶︎ Connect YouTube
+            </button>
+          </div>
+        )}
+
+        {/* Rest of UI remains unchanged (Spinner, manual input, modal, footer, etc.) */}
+        {/* <...FULL EXISTING WHEEL UI CODE CONTINUES BELOW...> */}
         {/* Left-side text */}
         <div
           className="subtitle"
@@ -272,7 +291,6 @@ export default function Home() {
           {entries.length}
         </div>
 
-        {/* WHEEL */}
         <div className="wheel-container">
           <canvas
             ref={canvasRef}
@@ -303,9 +321,26 @@ export default function Home() {
           style={{ flexDirection: "column", alignItems: "center" }}
         >
           <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-            <input type="text" disabled />
-            <input type="number" style={{ width: "50px" }} disabled />
-            <button disabled>Add Entry</button>
+            <input
+              type="text"
+              placeholder="Enter name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addEntry()}
+              disabled
+            />
+            <input
+              type="number"
+              min="1"
+              max="20"
+              value={amount}
+              onChange={(e) => setAmount(parseInt(e.target.value))}
+              style={{ width: "50px" }}
+              disabled
+            />
+            <button onClick={addEntry} disabled>
+              Add Entry
+            </button>
           </div>
 
           <button
@@ -322,6 +357,7 @@ export default function Home() {
             Clear Wheel
           </button>
         </div>
+
         {/* Winner Modal */}
         {showWinnerModal && winnerIndex !== null && (
           <div
@@ -384,9 +420,15 @@ export default function Home() {
 
         <style jsx>{`
           @keyframes swing {
-            0% { transform: rotate(-10deg); }
-            50% { transform: rotate(10deg); }
-            100% { transform: rotate(-10deg); }
+            0% {
+              transform: rotate(-10deg);
+            }
+            50% {
+              transform: rotate(10deg);
+            }
+            100% {
+              transform: rotate(-10deg);
+            }
           }
           .grim-swing {
             animation: swing 1.2s ease-in-out infinite;
@@ -394,15 +436,31 @@ export default function Home() {
           }
 
           @keyframes popBounce {
-            0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(1); }
+            0% {
+              transform: scale(0);
+              opacity: 0;
+            }
+            60% {
+              transform: scale(1.2);
+              opacity: 1;
+            }
+            100% {
+              transform: scale(1);
+            }
           }
 
           @keyframes textBounce {
-            0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(1); }
+            0% {
+              transform: scale(0);
+              opacity: 0;
+            }
+            60% {
+              transform: scale(1.3);
+              opacity: 1;
+            }
+            100% {
+              transform: scale(1);
+            }
           }
         `}</style>
 
@@ -413,7 +471,7 @@ export default function Home() {
             marginTop: "20px",
           }}
         >
-          Developed By Shkrimpi - v1.1.3
+          Developed By Shkrimpi - v1.1.2
         </footer>
       </div>
     </div>

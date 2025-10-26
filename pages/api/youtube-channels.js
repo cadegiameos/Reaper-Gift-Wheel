@@ -1,3 +1,4 @@
+// pages/api/youtube-channels.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
@@ -15,17 +16,14 @@ export default async function handler(req, res) {
         .json({ message: "Not connected to YouTube", channels: [] });
     }
 
-    // ✅ Create OAuth2 client and attach token properly
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token });
+    // Use OAuth2 client with the stored access token (NOT an API key)
+    const oauth2 = new google.auth.OAuth2();
+    oauth2.setCredentials({ access_token });
 
-    // ✅ Use OAuth2 client instead of raw token string
-    const youtube = google.youtube({
-      version: "v3",
-      auth: oauth2Client,
-    });
+    const youtube = google.youtube({ version: "v3", auth: oauth2 });
 
-    // ✅ Fetch owned channels (mine: true)
+    // This lists channels for the CURRENT AUTHORIZED IDENTITY.
+    // If the user picked a Brand Account during OAuth, that brand channel will appear here.
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
@@ -41,7 +39,6 @@ export default async function handler(req, res) {
           ch.snippet?.thumbnails?.high?.url ||
           ch.snippet?.thumbnails?.medium?.url ||
           null,
-        access: "owner",
       })) || [];
 
     return res.status(200).json({ channels });
@@ -49,6 +46,6 @@ export default async function handler(req, res) {
     console.error("youtube-channels error:", err);
     return res
       .status(500)
-      .json({ message: "Failed to load channels", channels: [] });
+      .json({ message: "Failed to fetch channels", channels: [] });
   }
 }

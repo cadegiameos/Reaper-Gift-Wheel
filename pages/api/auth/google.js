@@ -18,33 +18,29 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 export default async function handler(req, res) {
-  // ✅ STEP 1: If there's no code, redirect to Google login
   if (!req.query.code) {
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
-      prompt: "consent select_account", // ensures user picks account
-      include_granted_scopes: true,
+      prompt: "consent",
       scope: [
-        "https://www.googleapis.com/auth/youtube.readonly",
-        "https://www.googleapis.com/auth/youtube.channel-memberships.creator"
+        "https://www.googleapis.com/auth/youtube.readonly",     // Personal channel
+        "https://www.googleapis.com/auth/youtube.force-ssl",    // Needed for live chat
+        "https://www.googleapis.com/auth/youtubepartner",       // Editor access support
+        "https://www.googleapis.com/auth/youtube.channel-memberships.creator" // Critical for membership/gift tracking
       ],
     });
     return res.redirect(authUrl);
   }
 
-  // ✅ STEP 2: Try to exchange code for token
   try {
     const { tokens } = await oauth2Client.getToken(req.query.code);
     oauth2Client.setCredentials(tokens);
 
     await redis.set("yt_access_token", tokens.access_token);
 
-    console.log("✅ YouTube token saved.");
-    return res.redirect("/choose-channel");
+    return res.redirect("/connected-success");
   } catch (err) {
     console.error("OAuth2 Error:", err);
-    return res
-      .status(500)
-      .send("Authentication failed. Please try again later.");
+    return res.status(500).send("Authentication failed. Please try again later.");
   }
 }

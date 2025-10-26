@@ -166,24 +166,25 @@ export default function Home() {
         </h1>
 
         {/* ✅ Green tick bottom-right when fully connected */}
-        {ytConnected && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "20px",
-              right: "20px",
-              background: "rgba(0,255,0,0.7)",
-              color: "#000",
-              padding: "10px 15px",
-              borderRadius: "50%",
-              fontSize: "1.5em",
-              fontWeight: "bold",
-              zIndex: 9999,
-            }}
-          >
-            ✓
-          </div>
-        )}
+       {ytConnected && (
+  <div
+    style={{
+      position: "absolute",
+      bottom: "60px", // ⬅️ moved up from 20px
+      right: "20px",
+      background: "rgba(0,255,0,0.7)",
+      color: "#000",
+      padding: "10px 15px",
+      borderRadius: "50%",
+      fontSize: "1.5em",
+      fontWeight: "bold",
+      zIndex: 9999,
+    }}
+  >
+    ✓
+  </div>
+)}
+
 
         {/* ▶ Connect YouTube button if not connected */}
         {!ytConnected && (

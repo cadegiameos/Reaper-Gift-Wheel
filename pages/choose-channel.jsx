@@ -8,7 +8,7 @@ export default function ChooseChannel() {
   useEffect(() => {
     async function fetchChannels() {
       try {
-        const res = await fetch("/api/get-channels");
+        const res = await fetch("/api/youtube-channels");
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Failed to load channels");
         setChannels(data.channels || []);
@@ -29,7 +29,7 @@ export default function ChooseChannel() {
         body: JSON.stringify({ channelId, channelTitle }),
       });
       if (res.ok) {
-        window.location.href = "/connected-success"; // Redirect after saving
+        window.location.href = "/connected-success"; // ✅ Redirect after saving
       } else {
         alert("Failed to save channel. Try again.");
       }
@@ -52,6 +52,9 @@ export default function ChooseChannel() {
 
       {loading && <p>Loading channels...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
+      {!loading && channels.length === 0 && (
+        <p>No channels found. Are you sure this Google account has a channel or editor access?</p>
+      )}
 
       <div style={{ marginTop: "20px" }}>
         {channels.map((ch) => (
@@ -69,7 +72,7 @@ export default function ChooseChannel() {
               cursor: "pointer",
             }}
           >
-            {ch.title}
+            {ch.title} {ch.role === "editor" ? "(Editor Access)" : ""}
           </button>
         ))}
       </div>

@@ -11,43 +11,51 @@ export default async function handler(req, res) {
   try {
     const access_token = await redis.get("yt_access_token");
     if (!access_token) {
-      return res
-        .status(401)
-        .json({ message: "Not connected to YouTube", channels: [] });
+      return res.status(401).json({ message: "Not connected to YouTube", channels: [] });
     }
-
-    // ✅ Set up OAuth client with token
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token });
 
     const youtube = google.youtube({
       version: "v3",
-      auth: oauth2Client,
+      auth: access_token,
     });
 
-    // ✅ Get channels the user owns or manages
-    const resp = await youtube.channels.list({
+    let allChannels = [];
+
+    // ✅ Fetch user-owned channels
+    const personalResp = await youtube.channels.list({
       part: "snippet",
       mine: true,
       maxResults: 50,
     });
 
-    const channels =
-      (resp.data.items || []).map((ch) => ({
-        id: ch.id,
-        title: ch.snippet?.title || "Untitled",
-        thumbnail:
-          ch.snippet?.thumbnails?.default?.url ||
-          ch.snippet?.thumbnails?.high?.url ||
-          ch.snippet?.thumbnails?.medium?.url ||
-          null,
-      })) || [];
+    const personalChannels = (personalResp.data.items || []).map((ch) => ({
+      id: ch.id,
+      title: ch.snippet?.title || "Untitled",
+      thumbnail:
+        ch.snippet?.thumbnails?.default?.url ||
+        ch.snippet?.thumbnails?.medium?.url ||
+        ch.snippet?.thumbnails?.high?.url ||
+        null,
+      type: "Owner",
+    }));
 
-    return res.status(200).json({ channels });
+    allChannels.push(...personalChannels);
+
+    // ✅ If channel-membership permissions exist → user may have EDITOR rights
+    try {
+      const editorResp = await youtube.membershipsLevels.list({ part: "snippet" });
+      if (editorResp.data.kind) {
+        // Even if list is empty, access exists, so assume editor access possible
+        // Let them manually choose after checking with live broadcast fetch
+        // NOTE: actual validation will happen when polling live streams
+      }
+    } catch (err) {
+      // No editor access -- do nothing
+    }
+
+    return res.status(200).json({ channels: allChannels });
   } catch (err) {
     console.error("youtube-channels error:", err);
-    return res
-      .status(500)
-      .json({ message: "Failed to fetch channels", channels: [] });
+    return res.status(500).json({ message: "Failed to load channels", channels: [] });
   }
 }

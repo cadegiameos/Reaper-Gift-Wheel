@@ -18,20 +18,20 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 export default async function handler(req, res) {
-  // 🔹 If no ?code yet → send user to Google
+  // Step 1: If no ?code yet → send user to Google
   if (!req.query.code) {
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
       scope: [
         "https://www.googleapis.com/auth/youtube.readonly",
-        "https://www.googleapis.com/auth/youtube.liveChat.messages", // required for live chat access
+        "https://www.googleapis.com/auth/youtube.force-ssl", // ✅ VALID FOR LIVE CHAT ACCESS
       ],
     });
     return res.redirect(authUrl);
   }
 
-  // 🔹 Google returned ?code → exchange for tokens
+  // Step 2: Google returned ?code → exchange for tokens
   try {
     const { tokens } = await oauth2Client.getToken(req.query.code);
     await redis.set("yt_access_token", tokens.access_token || "");
@@ -39,11 +39,11 @@ export default async function handler(req, res) {
       await redis.set("yt_refresh_token", tokens.refresh_token);
     }
 
-    // ✅ Clear old channel state
+    // ✅ Clear previous channel selection
     await redis.del("yt_channel_id");
     await redis.del("yt_channel_title");
 
-    // ✅ Go to channel selection page
+    // ✅ Redirect to channel selector
     return res.redirect("/connected-success");
   } catch (err) {
     console.error("OAuth2 Error:", err);

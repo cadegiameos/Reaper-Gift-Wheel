@@ -19,17 +19,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "No channel selected" });
     }
 
+    // ✅ Initialize OAuth2 client with token
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token });
+
+    // ✅ Use OAuth client instead of raw token
     const youtube = google.youtube({
       version: "v3",
-      auth: access_token,
+      auth: oauth2Client,
     });
 
-    // ✅ Get ALL active broadcasts regardless of ownership
+    // ✅ Fetch active broadcasts from this account
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
       maxResults: 50,
-      // ⚠️ IMPORTANT: We removed `mine: true`
+      mine: true,
     });
 
     const items = broadcasts.data.items || [];
@@ -57,7 +62,7 @@ export default async function handler(req, res) {
     const messages = chat.data.items || [];
     let newEntries = [];
 
-    // ✅ Track processed membership gift messages to prevent duplicates
+    // ✅ Load processed gift IDs to avoid duplicates
     const processedGiftIds = (await redis.get("processedGiftIds")) || [];
 
     for (const msg of messages) {
@@ -65,7 +70,7 @@ export default async function handler(req, res) {
       const author = msg?.authorDetails?.displayName || "Unknown";
       const messageId = msg?.id;
 
-      // 🎯 Match phrases like: "John gifted 5 memberships!"
+      // ✅ Only match gift events
       const match = text.match(/gifted\s+(\d+)\s+member/i);
       if (match && messageId && !processedGiftIds.includes(messageId)) {
         const amount = parseInt(match[1], 10);
@@ -74,17 +79,18 @@ export default async function handler(req, res) {
           const updated = [...existing, ...Array(amount).fill(author)];
           await redis.set("wheelEntries", updated);
 
-          // ✅ Store as processed to avoid duplicates
+          // ✅ Store message ID as processed
           processedGiftIds.push(messageId);
           newEntries.push({ name: author, amount });
         }
       }
     }
 
-    // ✅ Limit to last 500 IDs to avoid Redis bloat
+    // ✅ Keep list from growing too big
     if (processedGiftIds.length > 500) {
       processedGiftIds.splice(0, processedGiftIds.length - 500);
     }
+
     await redis.set("processedGiftIds", processedGiftIds);
 
     return res.status(200).json({
@@ -94,9 +100,8 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("youtube-gifts error:", err);
-    return res.status(500).json({
-      error: err.message,
-      stack: err.stack || "No stack",
-    });
+    return res
+      .status(500)
+      .json({ error: err.message, stack: err.stack || "No stack" });
   }
 }

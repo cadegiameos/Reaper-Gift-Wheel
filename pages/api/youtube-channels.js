@@ -9,6 +9,7 @@ const redis = new Redis({
 
 export default async function handler(req, res) {
   try {
+    // ✅ Fetch access token
     const access_token = await redis.get("yt_access_token");
 
     if (!access_token) {
@@ -18,12 +19,17 @@ export default async function handler(req, res) {
       });
     }
 
+    // ✅ Initialize OAuth2 client correctly
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token });
+
+    // ✅ Use OAuth2 client here
     const youtube = google.youtube({
       version: "v3",
-      auth: access_token,
+      auth: oauth2Client,
     });
 
-    // ✅ First attempt: get channels owned by this account
+    // ✅ Fetch channels where this account is owner/manager
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
@@ -44,12 +50,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ channels });
   } catch (err) {
     console.error("youtube-channels error:", err);
-
-    // ✅ Return full debug info temporarily
-    return res.status(500).json({
-      message: "Failed to load channels",
-      error: err.message || String(err),
-      fullErrorResponse: err.errors || null,
-    });
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch channels", channels: [] });
   }
 }

@@ -1,8 +1,10 @@
-// pages/api/youtube-gifts.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+const redis = new Redis({
+  url: process.env.KV_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 export default async function handler(req, res) {
   try {
@@ -12,7 +14,6 @@ export default async function handler(req, res) {
     if (!access_token) {
       return res.status(401).json({ message: "Not connected to YouTube" });
     }
-
     if (!channelId) {
       return res.status(400).json({ message: "No channel selected" });
     }
@@ -25,19 +26,19 @@ export default async function handler(req, res) {
       auth: oauth2Client,
     });
 
-    // ✅ Fetch active streams under authenticated identity (brand/logged-in profile)
+    // Active broadcasts for the signed-in identity
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
       maxResults: 50,
-      mine: true,
+      mine: true, 
     });
 
     const items = broadcasts.data.items || [];
-
-    // ✅ Match only the chosen channel (owned or managed)
     const active = items.find(
-      (b) => b?.snippet?.channelId === channelId && b?.snippet?.liveChatId
+      (b) =>
+        b?.snippet?.channelId === channelId &&
+        b?.snippet?.liveChatId
     );
 
     if (!active) {
@@ -49,8 +50,10 @@ export default async function handler(req, res) {
     }
 
     const liveChatId = active.snippet.liveChatId;
+    const processedKey = `processedGiftIds:${liveChatId}`;
+    const processedGiftIds = (await redis.get(processedKey)) || [];
+    let newEntries = [];
 
-    // ✅ Read messages from live chat
     const chat = await youtube.liveChatMessages.list({
       liveChatId,
       part: "snippet,authorDetails",
@@ -59,22 +62,13 @@ export default async function handler(req, res) {
 
     const messages = chat.data.items || [];
 
-    // ✅ Deduplicate using message IDs PER live chat to avoid pollution
-    const processedKey = `processedGiftIds:${liveChatId}`;
-    const processedGiftIds = (await redis.get(processedKey)) || [];
-
-    let newEntries = [];
-
     for (const msg of messages) {
       const text = msg?.snippet?.displayMessage || "";
       const author = msg?.authorDetails?.displayName || "Unknown";
       const messageId = msg?.id;
 
-      // 🎯 Match "gifted X member(s)" format
       const match = text.match(/gifted\s+(\d+)\s+member/i);
       if (!match || !messageId) continue;
-
-      // 🚫 Skip duplicate gift events
       if (processedGiftIds.includes(messageId)) continue;
 
       const amount = parseInt(match[1], 10);
@@ -88,7 +82,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ Keep last 500 processed IDs per live stream
     if (processedGiftIds.length > 500) {
       processedGiftIds.splice(0, processedGiftIds.length - 500);
     }

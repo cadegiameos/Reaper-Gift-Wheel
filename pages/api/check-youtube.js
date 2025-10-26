@@ -9,18 +9,9 @@ const redis = new Redis({
 export default async function handler(req, res) {
   try {
     const accessToken = await redis.get("yt_access_token");
-    const channelId = await redis.get("yt_channel_id");
     const channelTitle = await redis.get("yt_channel_title");
-    const fullyConnected = !!accessToken && !!channelId;
-
-    return res.status(200).json({
-      accessTokenExists: !!accessToken,
-      channelIdExists: !!channelId,
-      channelTitle: channelTitle || null,
-      exists: fullyConnected,
-    });
-  } catch (err) {
-    console.error("check-youtube error:", err);
-    return res.status(500).json({ exists: false, error: err.message });
+    return res.status(200).json({ exists: !!accessToken, channelTitle: channelTitle || null });
+  } catch {
+    return res.status(500).json({ exists: false, channelTitle: null });
   }
 }

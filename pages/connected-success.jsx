@@ -1,11 +1,10 @@
-// pages/connected-success.jsx
 import React, { useEffect, useState } from "react";
 
 export default function ConnectedSuccess() {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -15,7 +14,7 @@ export default function ConnectedSuccess() {
         if (!res.ok) throw new Error(data.message || "Failed to load channels");
         setChannels(data.channels || []);
       } catch (e) {
-        setError(e.message);
+        setErr(e.message);
       } finally {
         setLoading(false);
       }
@@ -30,10 +29,15 @@ export default function ConnectedSuccess() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channelId: ch.id, channelTitle: ch.title }),
       });
-      if (!res.ok) throw new Error("Failed to save channel");
-      window.location.href = "/";
+
+      if (res.ok) {
+        window.location.href = "/";
+      } else {
+        alert("Failed to save channel. Try again.");
+        setSaving(false);
+      }
     } catch (e) {
-      alert(e.message);
+      alert("Error saving channel: " + e.message);
       setSaving(false);
     }
   };
@@ -42,53 +46,57 @@ export default function ConnectedSuccess() {
     <div
       style={{
         width: "100vw",
-        height: "100vh",
+        minHeight: "100vh",
         background: "#121212",
         color: "#fff",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        padding: "20px",
+        padding: "60px 20px",
       }}
     >
-      <h1 style={{ marginBottom: 6 }}>✅ YouTube Connected</h1>
-      <p style={{ marginBottom: 24 }}>
-        Select the channel to use for gifted memberships:
+      <h1 style={{ marginBottom: 10 }}>✅ YouTube Connected</h1>
+      <p style={{ marginBottom: 30 }}>
+        Select the channel to monitor for gifted memberships:
       </p>
 
       {loading && <p>Loading channels…</p>}
-      {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+      {err && <p style={{ color: "salmon" }}>{err}</p>}
 
       {!loading && channels.length === 0 && (
-        <p>No channels found for this Google account or Brand identity.</p>
+        <div style={{ textAlign: "center", opacity: 0.9 }}>
+          <p>No channels found.</p>
+          <p>
+            Make sure you logged in using the Brand/editor identity with the
+            correct access.
+          </p>
+        </div>
       )}
 
-      {!loading && channels.length > 0 && (
+      {channels.length > 0 && (
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: 16,
-            width: "85%",
+            width: "90%",
             maxWidth: 960,
           }}
         >
           {channels.map((ch) => (
             <button
               key={ch.id}
-              onClick={() => handleSelect(ch)}
               disabled={saving}
+              onClick={() => handleSelect(ch)}
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                background: "#1f1f1f",
+                background: "#222",
                 padding: 18,
-                borderRadius: 12,
+                borderRadius: 10,
                 cursor: "pointer",
-                border: "1px solid #2a2a2a",
+                border: "1px solid #333",
               }}
             >
               {ch.thumbnail && (
@@ -96,16 +104,18 @@ export default function ConnectedSuccess() {
                   src={ch.thumbnail}
                   alt={ch.title}
                   style={{
-                    width: 76,
-                    height: 76,
+                    width: 72,
+                    height: 72,
                     borderRadius: "50%",
                     marginBottom: 12,
                   }}
                 />
               )}
-              <span style={{ fontWeight: 600 }}>{ch.title}</span>
+              <span style={{ fontSize: "1.05em", fontWeight: 700 }}>
+                {ch.title}
+              </span>
               <small style={{ opacity: 0.7, marginTop: 6 }}>
-                Owned / Editor Access
+                Owned / Editor
               </small>
             </button>
           ))}

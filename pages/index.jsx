@@ -15,7 +15,7 @@ export default function Home() {
 
   const canvasRef = useRef(null);
 
-  // scale to window
+  // Scale UI to window size
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -28,7 +28,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // load entries
+  // Load entries
   useEffect(() => {
     (async () => {
       try {
@@ -39,7 +39,7 @@ export default function Home() {
     })();
   }, []);
 
-  // connection check
+  // Check connection
   useEffect(() => {
     (async () => {
       try {
@@ -54,26 +54,7 @@ export default function Home() {
     })();
   }, []);
 
-  // add entry (manual - disabled in UI)
-  const addEntry = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || amount < 1) return;
-    try {
-      const res = await fetch("/api/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, amount: Number(amount) }),
-      });
-      const data = await res.json();
-      if (Array.isArray(data.entries)) {
-        setEntries(data.entries);
-        setName("");
-        setAmount(1);
-      }
-    } catch {}
-  };
-
-  // clear entries
+  // Clear entries
   const clearEntries = async () => {
     try {
       const res = await fetch("/api/entries", { method: "DELETE" });
@@ -89,7 +70,7 @@ export default function Home() {
     } catch {}
   };
 
-  // idle slow rotation
+  // Idle slow spin
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isSpinning) setRotation((prev) => (prev + 0.1) % 360);
@@ -97,7 +78,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isSpinning]);
 
-  // winner flashing
+  // Flashing winner
   useEffect(() => {
     if (winnerIndex !== null) {
       const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
@@ -105,7 +86,7 @@ export default function Home() {
     }
   }, [winnerIndex]);
 
-  // draw wheel
+  // Draw wheel
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -153,11 +134,9 @@ export default function Home() {
       let fontSize = Math.min(40, sliceWidth / entry.length);
       fontSize = Math.max(fontSize, 10);
       ctx.font = `bold ${fontSize}px Arial`;
-
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#000";
-
       const textRadius = radius * 0.6;
       ctx.fillText(entry, textRadius, 0);
 
@@ -165,6 +144,7 @@ export default function Home() {
     });
   }, [entries, rotation, winnerIndex, flash]);
 
+  // Spin handler
   const spinWheel = () => {
     if (entries.length === 0) return alert("No entries to spin!");
     setIsSpinning(true);
@@ -183,7 +163,7 @@ export default function Home() {
     }, 5000);
   };
 
-  // poll for gifts
+  // Poll live chat for gifts
   useEffect(() => {
     if (!ytConnected) return;
     const poll = setInterval(async () => {
@@ -283,7 +263,6 @@ export default function Home() {
         )}
 
         <div
-          className="subtitle"
           style={{
             position: "absolute",
             left: "13.5%",
@@ -302,7 +281,6 @@ export default function Home() {
         </div>
 
         <div
-          className="subtitle"
           style={{
             position: "absolute",
             right: "7.5%",
@@ -344,47 +322,19 @@ export default function Home() {
           </button>
         </div>
 
-        <div
-          className="manual-entry"
-          style={{ flexDirection: "column", alignItems: "center" }}
+        <button
+          className="clear-btn"
+          onClick={clearEntries}
+          style={{ marginTop: "10px" }}
+          disabled={!ytConnected}
+          title={
+            ytConnected
+              ? "Clear all entries"
+              : "Only the connected YouTube editor can clear the wheel"
+          }
         >
-          <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-            <input
-              type="text"
-              placeholder="Enter name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addEntry()}
-              disabled
-            />
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={amount}
-              onChange={(e) => setAmount(parseInt(e.target.value))}
-              style={{ width: "50px" }}
-              disabled
-            />
-            <button onClick={addEntry} disabled>
-              Add Entry
-            </button>
-          </div>
-
-          <button
-            className="clear-btn"
-            onClick={clearEntries}
-            style={{ marginTop: "10px" }}
-            disabled={!ytConnected}
-            title={
-              ytConnected
-                ? "Clear all entries"
-                : "Only the connected YouTube editor can clear the wheel"
-            }
-          >
-            Clear Wheel
-          </button>
-        </div>
+          Clear Wheel
+        </button>
 
         {showWinnerModal && winnerIndex !== null && (
           <div
@@ -423,7 +373,7 @@ export default function Home() {
                 style={{
                   fontSize: "3.6em",
                   margin: "30px 0",
-                  fontFamily: "'Tooth and Nail Regular', Arial, sans-serif",  
+                  fontFamily: "'Tooth and Nail Regular', Arial, sans-serif",
                   fontWeight: "bold",
                   animation: "textBounce 0.6s ease forwards",
                 }}
@@ -445,46 +395,6 @@ export default function Home() {
           </div>
         )}
 
-        <style jsx>{`
-          @keyframes swing {
-            0% {
-              transform: rotate(-10deg);
-            }
-            50% {
-              transform: rotate(10deg);
-            }
-            100% {
-              transform: rotate(-10deg);
-            }
-          }
-          .grim-swing {
-            animation: swing 1.2s ease-in-out infinite;
-            transform-origin: top center;
-          }
-          @keyframes popBounce {
-            0% {
-              transform: scale(0); opacity: 0;
-            }
-            60% {
-              transform: scale(1.2); opacity: 1;
-            }
-            100% {
-              transform: scale(1);
-            }
-          }
-          @keyframes textBounce {
-            0% {
-              transform: scale(0); opacity: 0;
-            }
-            60% {
-              transform: scale(1.3); opacity: 1;
-            }
-            100% {
-              transform: scale(1);
-            }
-          }
-        `}</style>
-
         <footer
           style={{
             textAlign: "center",
@@ -492,7 +402,7 @@ export default function Home() {
             marginTop: "20px",
           }}
         >
-          Developed By Shkrimpi - v1.1.2 - FUCK OFF RASTOV
+          Developed By Shkrimpi - v1.1.2
         </footer>
       </div>
     </div>

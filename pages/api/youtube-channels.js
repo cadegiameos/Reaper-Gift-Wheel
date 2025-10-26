@@ -1,17 +1,21 @@
-// pages/api/youtube-channels.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+const redis = new Redis({
+  url: process.env.KV_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 export default async function handler(req, res) {
   try {
     const access_token = await redis.get("yt_access_token");
     if (!access_token) {
-      return res.status(401).json({ message: "Not connected to YouTube", channels: [] });
+      return res.status(401).json({
+        message: "Not connected to YouTube",
+        channels: [],
+      });
     }
 
-    // ✅ Use OAuth2 client (NO API KEY needed or used)
     const oauth2Client = new google.auth.OAuth2();
     oauth2Client.setCredentials({ access_token });
 
@@ -20,7 +24,7 @@ export default async function handler(req, res) {
       auth: oauth2Client,
     });
 
-    // ✅ This fetches channels the user OWNS or is directly associated with (Brand/Primary)
+    // mine:true will now return channels that the user OWNS or has EDITOR access to (if signed in as proper identity)
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
@@ -41,8 +45,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ channels });
   } catch (err) {
     console.error("youtube-channels error:", err);
-    return res
-      .status(500)
-      .json({ message: "Failed to load channels", channels: [] });
+    return res.status(500).json({
+      message: "Failed to load channels",
+      channels: [],
+    });
   }
 }

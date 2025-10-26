@@ -1,4 +1,3 @@
-// pages/api/youtube-channels.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
@@ -16,12 +15,17 @@ export default async function handler(req, res) {
         .json({ message: "Not connected to YouTube", channels: [] });
     }
 
+    // ✅ Create OAuth2 client and attach token properly
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token });
+
+    // ✅ Use OAuth2 client instead of raw token string
     const youtube = google.youtube({
       version: "v3",
-      auth: access_token,
+      auth: oauth2Client,
     });
 
-    // ✅ Get ONLY owned channels for now
+    // ✅ Fetch owned channels (mine: true)
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
@@ -37,7 +41,7 @@ export default async function handler(req, res) {
           ch.snippet?.thumbnails?.high?.url ||
           ch.snippet?.thumbnails?.medium?.url ||
           null,
-        access: "owner", // Defaulting to owner for now
+        access: "owner",
       })) || [];
 
     return res.status(200).json({ channels });

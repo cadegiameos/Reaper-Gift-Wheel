@@ -54,7 +54,11 @@ export default function Home() {
     })();
   }, []);
 
+<<<<<<< HEAD
   // add entry (kept but inputs disabled in UI)
+=======
+  // add entry (manual - disabled in UI)
+>>>>>>> 2cb884d (final)
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -73,7 +77,11 @@ export default function Home() {
     } catch {}
   };
 
+<<<<<<< HEAD
   // clear entries (editor only)
+=======
+  // clear entries
+>>>>>>> 2cb884d (final)
   const clearEntries = async () => {
     try {
       const res = await fetch("/api/entries", { method: "DELETE" });
@@ -97,7 +105,11 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isSpinning]);
 
+<<<<<<< HEAD
   // winner flash
+=======
+  // winner flashing
+>>>>>>> 2cb884d (final)
   useEffect(() => {
     if (winnerIndex !== null) {
       const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
@@ -183,7 +195,11 @@ export default function Home() {
     }, 5000);
   };
 
+<<<<<<< HEAD
   // poll chat for gifted messages (only when fully connected)
+=======
+  // poll for gifts
+>>>>>>> 2cb884d (final)
   useEffect(() => {
     if (!ytConnected) return;
     const poll = setInterval(async () => {
@@ -223,7 +239,11 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
+<<<<<<< HEAD
         {/* Connect button (top-right under heading) */}
+=======
+        {/* Connect button */}
+>>>>>>> 2cb884d (final)
         {!ytConnected && (
           <div style={{ position: "absolute", top: "140px", right: "60px" }}>
             <button
@@ -245,12 +265,20 @@ export default function Home() {
           </div>
         )}
 
+<<<<<<< HEAD
         {/* Green tick + channel name (moved up a bit) */}
+=======
+        {/* Connected badge - slightly higher (was 48px, now 90px) */}
+>>>>>>> 2cb884d (final)
         {ytConnected && (
           <div
             style={{
               position: "absolute",
+<<<<<<< HEAD
               bottom: "48px",
+=======
+              bottom: "90px",
+>>>>>>> 2cb884d (final)
               right: "24px",
               display: "flex",
               alignItems: "center",
@@ -481,7 +509,7 @@ export default function Home() {
             marginTop: "20px",
           }}
         >
-          Developed By Shkrimpi - v1.1.2
+          Developed By Shkrimpi - v1.1.2 - FUCK OFF RASTOV
         </footer>
       </div>
     </div>

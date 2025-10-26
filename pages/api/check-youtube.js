@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       exists: fullyConnected,
     });
   } catch (err) {
-    console.error("Error checking YouTube:", err);
+    console.error("check-youtube error:", err);
     return res.status(500).json({ exists: false, error: err.message });
   }
 }

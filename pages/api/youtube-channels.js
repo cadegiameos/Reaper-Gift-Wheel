@@ -2,10 +2,7 @@
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
-const redis = new Redis({
-  url: process.env.KV_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
+const redis = Redis.fromEnv();
 
 export default async function handler(req, res) {
   try {
@@ -14,33 +11,38 @@ export default async function handler(req, res) {
       return res.status(401).json({ message: "Not connected to YouTube", channels: [] });
     }
 
-    // Use OAuth token only (no API key)
+    // ✅ Use OAuth2 client (NO API KEY needed or used)
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token });
+
     const youtube = google.youtube({
       version: "v3",
-      auth: access_token,
+      auth: oauth2Client,
     });
 
-    // This returns channels owned by (or Brand Accounts selected by) the authed identity
+    // ✅ This fetches channels the user OWNS or is directly associated with (Brand/Primary)
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
       maxResults: 50,
     });
 
-    const channels =
-      (resp.data.items || []).map((ch) => ({
-        id: ch.id,
-        title: ch.snippet?.title || "Untitled",
-        thumbnail:
-          ch.snippet?.thumbnails?.default?.url ||
-          ch.snippet?.thumbnails?.high?.url ||
-          ch.snippet?.thumbnails?.medium?.url ||
-          null,
-      })) || [];
+    const channels = (resp.data.items || []).map((ch) => ({
+      id: ch.id,
+      title: ch.snippet?.title || "Untitled",
+      thumbnail:
+        ch.snippet?.thumbnails?.default?.url ||
+        ch.snippet?.thumbnails?.high?.url ||
+        ch.snippet?.thumbnails?.medium?.url ||
+        null,
+      source: "owned-or-managed",
+    }));
 
     return res.status(200).json({ channels });
   } catch (err) {
     console.error("youtube-channels error:", err);
-    return res.status(500).json({ message: "Failed to load channels", channels: [] });
+    return res
+      .status(500)
+      .json({ message: "Failed to load channels", channels: [] });
   }
 }

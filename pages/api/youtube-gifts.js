@@ -24,12 +24,12 @@ export default async function handler(req, res) {
       auth: access_token,
     });
 
-    // ✅ Fetch active live streams from the chosen channel only
+    // ✅ Get ALL active broadcasts regardless of ownership
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
       maxResults: 50,
-      mine: true,
+      // ⚠️ IMPORTANT: We removed `mine: true`
     });
 
     const items = broadcasts.data.items || [];
@@ -57,16 +57,15 @@ export default async function handler(req, res) {
     const messages = chat.data.items || [];
     let newEntries = [];
 
-    // ✅ Retrieve processed gift IDs (avoid duplicates)
-    const processedGiftIds =
-      (await redis.get("processedGiftIds")) || [];
+    // ✅ Track processed membership gift messages to prevent duplicates
+    const processedGiftIds = (await redis.get("processedGiftIds")) || [];
 
     for (const msg of messages) {
       const text = msg?.snippet?.displayMessage || "";
       const author = msg?.authorDetails?.displayName || "Unknown";
       const messageId = msg?.id;
 
-      // 🎯 Only match "gifted" messages
+      // 🎯 Match phrases like: "John gifted 5 memberships!"
       const match = text.match(/gifted\s+(\d+)\s+member/i);
       if (match && messageId && !processedGiftIds.includes(messageId)) {
         const amount = parseInt(match[1], 10);
@@ -75,18 +74,17 @@ export default async function handler(req, res) {
           const updated = [...existing, ...Array(amount).fill(author)];
           await redis.set("wheelEntries", updated);
 
-          // ✅ Mark this message as processed
+          // ✅ Store as processed to avoid duplicates
           processedGiftIds.push(messageId);
           newEntries.push({ name: author, amount });
         }
       }
     }
 
-    // ✅ Keep only the last 500 processed IDs (avoid bloating Redis)
+    // ✅ Limit to last 500 IDs to avoid Redis bloat
     if (processedGiftIds.length > 500) {
       processedGiftIds.splice(0, processedGiftIds.length - 500);
     }
-
     await redis.set("processedGiftIds", processedGiftIds);
 
     return res.status(200).json({
@@ -96,8 +94,9 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("youtube-gifts error:", err);
-    return res
-      .status(500)
-      .json({ error: err.message, stack: err.stack || "No stack" });
+    return res.status(500).json({
+      error: err.message,
+      stack: err.stack || "No stack",
+    });
   }
 }

@@ -3,19 +3,17 @@ import React, { useState, useEffect, useRef } from "react";
 
 export default function Home() {
   const [entries, setEntries] = useState([]);
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState(1);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [winnerIndex, setWinnerIndex] = useState(null);
   const [flash, setFlash] = useState(false);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [ytConnected, setYtConnected] = useState(false);
+  const [configured, setConfigured] = useState(false);
   const [channelTitle, setChannelTitle] = useState(null);
 
   const canvasRef = useRef(null);
 
-  // Scale UI to window size
+  // scale to window
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -28,7 +26,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load entries
+  // load entries
   useEffect(() => {
     (async () => {
       try {
@@ -39,54 +37,38 @@ export default function Home() {
     })();
   }, []);
 
-  // Check connection
+  // check configured + channel title
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/check-youtube");
         const data = await res.json();
-        setYtConnected(!!data.exists);
+        setConfigured(!!data.configured);
         setChannelTitle(data.channelTitle || null);
       } catch {
-        setYtConnected(false);
+        setConfigured(false);
         setChannelTitle(null);
       }
     })();
   }, []);
 
-  // Clear entries
-  const clearEntries = async () => {
-    try {
-      const res = await fetch("/api/entries", { method: "DELETE" });
-      if (res.ok) {
-        setEntries([]);
-        setWinnerIndex(null);
-        setFlash(false);
-        setShowWinnerModal(false);
-      } else {
-        const j = await res.json();
-        alert(j.message || "Not allowed");
-      }
-    } catch {}
-  };
-
-  // Idle slow spin
+  // idle rotation
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!isSpinning) setRotation((prev) => (prev + 0.1) % 360);
+    const t = setInterval(() => {
+      if (!isSpinning) setRotation((r) => (r + 0.1) % 360);
     }, 20);
-    return () => clearInterval(interval);
+    return () => clearInterval(t);
   }, [isSpinning]);
 
-  // Flashing winner
+  // winner flash
   useEffect(() => {
     if (winnerIndex !== null) {
-      const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
-      return () => clearInterval(flashInterval);
+      const t = setInterval(() => setFlash((f) => !f), 500);
+      return () => clearInterval(t);
     }
   }, [winnerIndex]);
 
-  // Draw wheel
+  // draw wheel
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -103,15 +85,15 @@ export default function Home() {
       return;
     }
 
-    const anglePerSlice = (2 * Math.PI) / entries.length;
+    const anglePer = (2 * Math.PI) / entries.length;
 
     entries.forEach((entry, i) => {
-      const startAngle = i * anglePerSlice;
-      const endAngle = startAngle + anglePerSlice;
+      const start = i * anglePer;
+      const end = start + anglePer;
 
       ctx.beginPath();
       ctx.moveTo(radius, radius);
-      ctx.arc(radius, radius, radius, startAngle, endAngle);
+      ctx.arc(radius, radius, radius, start, end);
       ctx.fillStyle = `hsl(${(i * 360) / entries.length}, 70%, 85%)`;
       ctx.fill();
       ctx.closePath();
@@ -119,7 +101,7 @@ export default function Home() {
       if (winnerIndex === i && flash) {
         ctx.beginPath();
         ctx.moveTo(radius, radius);
-        ctx.arc(radius, radius, radius, startAngle, endAngle);
+        ctx.arc(radius, radius, radius, start, end);
         ctx.strokeStyle = "white";
         ctx.lineWidth = 6;
         ctx.stroke();
@@ -128,15 +110,17 @@ export default function Home() {
 
       ctx.save();
       ctx.translate(radius, radius);
-      ctx.rotate(startAngle + anglePerSlice / 2);
+      ctx.rotate(start + anglePer / 2);
 
-      const sliceWidth = radius * anglePerSlice;
-      let fontSize = Math.min(40, sliceWidth / entry.length);
+      const sliceWidth = radius * anglePer;
+      let fontSize = Math.min(40, sliceWidth / (entry.length || 1));
       fontSize = Math.max(fontSize, 10);
       ctx.font = `bold ${fontSize}px Arial`;
+
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#000";
+
       const textRadius = radius * 0.6;
       ctx.fillText(entry, textRadius, 0);
 
@@ -144,7 +128,6 @@ export default function Home() {
     });
   }, [entries, rotation, winnerIndex, flash]);
 
-  // Spin handler
   const spinWheel = () => {
     if (entries.length === 0) return alert("No entries to spin!");
     setIsSpinning(true);
@@ -163,22 +146,34 @@ export default function Home() {
     }, 5000);
   };
 
-  // Poll live chat for gifts
+  // poll chat for gifted messages (only when configured)
   useEffect(() => {
-    if (!ytConnected) return;
+    if (!configured) return;
     const poll = setInterval(async () => {
       try {
         const res = await fetch("/api/youtube-gifts");
         const data = await res.json();
         if (data.added > 0) {
-          const res2 = await fetch("/api/entries");
-          const updated = await res2.json();
+          const r2 = await fetch("/api/entries");
+          const updated = await r2.json();
           if (Array.isArray(updated.entries)) setEntries(updated.entries);
         }
       } catch {}
     }, 10000);
     return () => clearInterval(poll);
-  }, [ytConnected]);
+  }, [configured]);
+
+  const clearEntries = async () => {
+    try {
+      const res = await fetch("/api/entries", { method: "DELETE" });
+      if (res.ok) {
+        setEntries([]);
+        setWinnerIndex(null);
+        setFlash(false);
+        setShowWinnerModal(false);
+      }
+    } catch {}
+  };
 
   return (
     <div
@@ -203,10 +198,10 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-        {!ytConnected && (
+        {!configured && (
           <div style={{ position: "absolute", top: "140px", right: "60px" }}>
             <button
-              onClick={() => (window.location.href = "/api/auth/google")}
+              onClick={() => (window.location.href = "/setup")}
               style={{
                 padding: "12px 28px",
                 fontSize: "1.2em",
@@ -218,13 +213,14 @@ export default function Home() {
                 cursor: "pointer",
                 boxShadow: "0px 4px 10px rgba(0,0,0,0.3)",
               }}
+              title="Owner must connect once"
             >
-              ▶︎ Connect YouTube
+              ▶︎ Owner Setup
             </button>
           </div>
         )}
 
-        {ytConnected && (
+        {configured && (
           <div
             style={{
               position: "absolute",
@@ -262,7 +258,9 @@ export default function Home() {
           </div>
         )}
 
+        {/* Left-side text */}
         <div
+          className="subtitle"
           style={{
             position: "absolute",
             left: "13.5%",
@@ -280,7 +278,9 @@ export default function Home() {
           1 GIFTED{"\n"}={"\n"}1 Entry
         </div>
 
+        {/* Right-side counter */}
         <div
+          className="subtitle"
           style={{
             position: "absolute",
             right: "7.5%",
@@ -322,20 +322,18 @@ export default function Home() {
           </button>
         </div>
 
-        <button
-          className="clear-btn"
-          onClick={clearEntries}
-          style={{ marginTop: "10px" }}
-          disabled={!ytConnected}
-          title={
-            ytConnected
-              ? "Clear all entries"
-              : "Only the connected YouTube editor can clear the wheel"
-          }
-        >
-          Clear Wheel
-        </button>
+        <div className="manual-entry" style={{ flexDirection: "column", alignItems: "center" }}>
+          <button
+            className="clear-btn"
+            onClick={clearEntries}
+            style={{ marginTop: "10px" }}
+            title="Clear all entries"
+          >
+            Clear Wheel
+          </button>
+        </div>
 
+        {/* Winner Modal */}
         {showWinnerModal && winnerIndex !== null && (
           <div
             style={{
@@ -395,14 +393,30 @@ export default function Home() {
           </div>
         )}
 
-        <footer
-          style={{
-            textAlign: "center",
-            fontFamily: "Arial",
-            marginTop: "20px",
-          }}
-        >
-          Developed By Shkrimpi - v1.1.2
+        <style jsx>{`
+          @keyframes swing {
+            0% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+            100% { transform: rotate(-10deg); }
+          }
+          .grim-swing {
+            animation: swing 1.2s ease-in-out infinite;
+            transform-origin: top center;
+          }
+          @keyframes popBounce {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); }
+          }
+          @keyframes textBounce {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(1); }
+          }
+        `}</style>
+
+        <footer style={{ textAlign: "center", fontFamily: "Arial", marginTop: "20px" }}>
+          Developed By Shkrimpi - v1.2.0 (Owner setup flow)
         </footer>
       </div>
     </div>

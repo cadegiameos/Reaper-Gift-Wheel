@@ -1,3 +1,4 @@
+// pages/api/refresh-token.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
 
@@ -6,26 +7,33 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 });
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google`
-);
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
-export default async function handler(req, res) {
+export async function getAuthedClient() {
+  const refresh_token = await redis.get("yt_refresh_token");
+  if (!refresh_token) return { client: null, reason: "NO_REFRESH" };
+
+  const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET);
+  oauth2Client.setCredentials({ refresh_token });
+
+  // Try to ensure access_token exists/valid
   try {
-    let refreshToken = await redis.get("yt_refresh_token");
-    if (!refreshToken) {
-      return res.status(401).json({ message: "Missing refresh token." });
-    }
-
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
     const { credentials } = await oauth2Client.refreshAccessToken();
-    await redis.set("yt_access_token", credentials.access_token);
-
-    return res.status(200).json({ message: "Token refreshed successfully" });
-  } catch (err) {
-    console.error("Error refreshing token:", err);
-    return res.status(500).json({ message: "Refresh failed" });
+    const access_token = credentials.access_token;
+    if (access_token) await redis.set("yt_access_token", access_token);
+  } catch (e) {
+    // If refresh fails, owner must re-connect
+    return { client: null, reason: "REFRESH_FAILED" };
   }
+
+  return { client: oauth2Client, reason: "OK" };
+}
+
+export default async function handler(_req, res) {
+  const r = await getAuthedClient();
+  if (!r.client) {
+    return res.status(400).json({ ok: false, reason: r.reason });
+  }
+  return res.status(200).json({ ok: true });
 }

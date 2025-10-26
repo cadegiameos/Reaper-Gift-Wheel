@@ -6,12 +6,17 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 });
 
-export default async function handler(req, res) {
+export default async function handler(_req, res) {
   try {
-    const accessToken = await redis.get("yt_access_token");
+    const channelId = await redis.get("yt_channel_id");
     const channelTitle = await redis.get("yt_channel_title");
-    return res.status(200).json({ exists: !!accessToken, channelTitle: channelTitle || null });
+    const refresh = await redis.get("yt_refresh_token");
+    return res.status(200).json({
+      configured: !!(channelId && refresh),
+      channelId: channelId || null,
+      channelTitle: channelTitle || null,
+    });
   } catch {
-    return res.status(500).json({ exists: false, channelTitle: null });
+    return res.status(200).json({ configured: false });
   }
 }

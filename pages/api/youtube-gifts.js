@@ -1,59 +1,52 @@
+// pages/api/youtube-gifts.js
 import { google } from "googleapis";
 import { Redis } from "@upstash/redis";
+import { getAuthedClient } from "./refresh-token";
 
 const redis = new Redis({
   url: process.env.KV_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
 
-export default async function handler(req, res) {
+export default async function handler(_req, res) {
   try {
-    const access_token = await redis.get("yt_access_token");
+    // Ensure we have a valid OAuth client (refresh token → access token)
+    const { client, reason } = await getAuthedClient();
+    if (!client) {
+      return res.status(401).json({ message: "Owner not connected", reason });
+    }
+
     const channelId = await redis.get("yt_channel_id");
-
-    if (!access_token) {
-      return res.status(401).json({ message: "Not connected to YouTube" });
-    }
     if (!channelId) {
-      return res.status(400).json({ message: "No channel selected" });
+      return res.status(400).json({ message: "Channel not configured" });
     }
 
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token });
+    const youtube = google.youtube({ version: "v3", auth: client });
 
-    const youtube = google.youtube({
-      version: "v3",
-      auth: oauth2Client,
-    });
-
-    // Active broadcasts for the signed-in identity
+    // Find active broadcasts for the OWNER'S channel identity we saved
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
       maxResults: 50,
-      mine: true, 
+      mine: true,
     });
 
     const items = broadcasts.data.items || [];
     const active = items.find(
-      (b) =>
-        b?.snippet?.channelId === channelId &&
-        b?.snippet?.liveChatId
+      (b) => b?.snippet?.channelId === channelId && b?.snippet?.liveChatId
     );
 
     if (!active) {
       return res.status(200).json({
-        message: "No active live stream found for selected channel",
+        message: "No active live stream found for configured channel",
         added: 0,
         newEntries: [],
       });
     }
 
     const liveChatId = active.snippet.liveChatId;
-    const processedKey = `processedGiftIds:${liveChatId}`;
-    const processedGiftIds = (await redis.get(processedKey)) || [];
-    let newEntries = [];
 
+    // fetch latest chat messages
     const chat = await youtube.liveChatMessages.list({
       liveChatId,
       part: "snippet,authorDetails",
@@ -61,27 +54,33 @@ export default async function handler(req, res) {
     });
 
     const messages = chat.data.items || [];
+    const processedKey = `processedGiftIds:${liveChatId}`;
+    const processedGiftIds = (await redis.get(processedKey)) || [];
+
+    let newEntries = [];
 
     for (const msg of messages) {
       const text = msg?.snippet?.displayMessage || "";
       const author = msg?.authorDetails?.displayName || "Unknown";
-      const messageId = msg?.id;
+      const id = msg?.id;
 
-      const match = text.match(/gifted\s+(\d+)\s+member/i);
-      if (!match || !messageId) continue;
-      if (processedGiftIds.includes(messageId)) continue;
+      // match "gifted 1 membership" / "gifted 5 memberships"
+      const m = text.match(/gifted\s+(\d+)\s+member/i);
+      if (!m || !id) continue;
+      if (processedGiftIds.includes(id)) continue;
 
-      const amount = parseInt(match[1], 10);
+      const amount = parseInt(m[1], 10);
       if (amount > 0) {
         const existing = (await redis.get("wheelEntries")) || [];
         const updated = [...existing, ...Array(amount).fill(author)];
         await redis.set("wheelEntries", updated);
 
-        processedGiftIds.push(messageId);
+        processedGiftIds.push(id);
         newEntries.push({ name: author, amount });
       }
     }
 
+    // keep last 500 id’s per-chat
     if (processedGiftIds.length > 500) {
       processedGiftIds.splice(0, processedGiftIds.length - 500);
     }
@@ -93,10 +92,7 @@ export default async function handler(req, res) {
       newEntries,
     });
   } catch (err) {
-    console.error("youtube-gifts error:", err);
-    return res.status(500).json({
-      error: err.message,
-      stack: err.stack || "No stack",
-    });
+    console.error("youtube-gifts error:", err?.response?.data || err);
+    return res.status(500).json({ error: "Failed to read chat" });
   }
 }

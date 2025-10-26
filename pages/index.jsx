@@ -54,11 +54,7 @@ export default function Home() {
     })();
   }, []);
 
-<<<<<<< HEAD
-  // add entry (kept but inputs disabled in UI)
-=======
   // add entry (manual - disabled in UI)
->>>>>>> 2cb884d (final)
   const addEntry = async () => {
     const trimmed = name.trim();
     if (!trimmed || amount < 1) return;
@@ -77,11 +73,7 @@ export default function Home() {
     } catch {}
   };
 
-<<<<<<< HEAD
-  // clear entries (editor only)
-=======
   // clear entries
->>>>>>> 2cb884d (final)
   const clearEntries = async () => {
     try {
       const res = await fetch("/api/entries", { method: "DELETE" });
@@ -105,11 +97,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isSpinning]);
 
-<<<<<<< HEAD
-  // winner flash
-=======
   // winner flashing
->>>>>>> 2cb884d (final)
   useEffect(() => {
     if (winnerIndex !== null) {
       const flashInterval = setInterval(() => setFlash((prev) => !prev), 500);
@@ -195,11 +183,7 @@ export default function Home() {
     }, 5000);
   };
 
-<<<<<<< HEAD
-  // poll chat for gifted messages (only when fully connected)
-=======
   // poll for gifts
->>>>>>> 2cb884d (final)
   useEffect(() => {
     if (!ytConnected) return;
     const poll = setInterval(async () => {
@@ -239,11 +223,6 @@ export default function Home() {
           Lolcow Reapers Gifted Member Wheel.
         </h1>
 
-<<<<<<< HEAD
-        {/* Connect button (top-right under heading) */}
-=======
-        {/* Connect button */}
->>>>>>> 2cb884d (final)
         {!ytConnected && (
           <div style={{ position: "absolute", top: "140px", right: "60px" }}>
             <button
@@ -265,20 +244,11 @@ export default function Home() {
           </div>
         )}
 
-<<<<<<< HEAD
-        {/* Green tick + channel name (moved up a bit) */}
-=======
-        {/* Connected badge - slightly higher (was 48px, now 90px) */}
->>>>>>> 2cb884d (final)
         {ytConnected && (
           <div
             style={{
               position: "absolute",
-<<<<<<< HEAD
-              bottom: "48px",
-=======
               bottom: "90px",
->>>>>>> 2cb884d (final)
               right: "24px",
               display: "flex",
               alignItems: "center",
@@ -312,7 +282,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Left-side text */}
         <div
           className="subtitle"
           style={{
@@ -332,7 +301,6 @@ export default function Home() {
           1 GIFTED{"\n"}={"\n"}1 Entry
         </div>
 
-        {/* Right-side counter */}
         <div
           className="subtitle"
           style={{
@@ -366,7 +334,6 @@ export default function Home() {
           />
         </div>
 
-        {/* Spin button */}
         <div className="controls" style={{ justifyContent: "center" }}>
           <button
             className="spin-btn"
@@ -377,7 +344,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Manual entry (visible but disabled) */}
         <div
           className="manual-entry"
           style={{ flexDirection: "column", alignItems: "center" }}
@@ -420,7 +386,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Winner Modal */}
         {showWinnerModal && winnerIndex !== null && (
           <div
             style={{
@@ -458,7 +423,7 @@ export default function Home() {
                 style={{
                   fontSize: "3.6em",
                   margin: "30px 0",
-                  fontFamily: "'Tooth and Nail Regular', Arial, sans-serif",
+                  fontFamily: "'Tooth and Nail Regular', Arial, sans-serif",  
                   fontWeight: "bold",
                   animation: "textBounce 0.6s ease forwards",
                 }}
@@ -482,23 +447,41 @@ export default function Home() {
 
         <style jsx>{`
           @keyframes swing {
-            0% { transform: rotate(-10deg); }
-            50% { transform: rotate(10deg); }
-            100% { transform: rotate(-10deg); }
+            0% {
+              transform: rotate(-10deg);
+            }
+            50% {
+              transform: rotate(10deg);
+            }
+            100% {
+              transform: rotate(-10deg);
+            }
           }
           .grim-swing {
             animation: swing 1.2s ease-in-out infinite;
             transform-origin: top center;
           }
           @keyframes popBounce {
-            0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(1); }
+            0% {
+              transform: scale(0); opacity: 0;
+            }
+            60% {
+              transform: scale(1.2); opacity: 1;
+            }
+            100% {
+              transform: scale(1);
+            }
           }
           @keyframes textBounce {
-            0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(1); }
+            0% {
+              transform: scale(0); opacity: 0;
+            }
+            60% {
+              transform: scale(1.3); opacity: 1;
+            }
+            100% {
+              transform: scale(1);
+            }
           }
         `}</style>
 

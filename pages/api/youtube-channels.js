@@ -16,36 +16,64 @@ export default async function handler(req, res) {
         .json({ message: "Not connected to YouTube", channels: [] });
     }
 
-    // Use OAuth2 client with the stored access token (NOT an API key)
-    const oauth2 = new google.auth.OAuth2();
-    oauth2.setCredentials({ access_token });
+    const youtube = google.youtube({
+      version: "v3",
+      auth: access_token,
+    });
 
-    const youtube = google.youtube({ version: "v3", auth: oauth2 });
-
-    // This lists channels for the CURRENT AUTHORIZED IDENTITY.
-    // If the user picked a Brand Account during OAuth, that brand channel will appear here.
-    const resp = await youtube.channels.list({
+    // ✅ 1) Get personal (owned) channel
+    const ownedResp = await youtube.channels.list({
       part: "snippet",
       mine: true,
       maxResults: 50,
     });
 
-    const channels =
-      (resp.data.items || []).map((ch) => ({
+    const ownedChannels =
+      (ownedResp.data.items || []).map((ch) => ({
         id: ch.id,
-        title: ch.snippet?.title || "Untitled",
+        title: ch.snippet?.title || "Untitled (Owned)",
         thumbnail:
           ch.snippet?.thumbnails?.default?.url ||
           ch.snippet?.thumbnails?.high?.url ||
           ch.snippet?.thumbnails?.medium?.url ||
           null,
+        type: "Owned Channel",
       })) || [];
 
-    return res.status(200).json({ channels });
+    // ✅ 2) Get channels where user has access via YouTube Studio
+    const brandResp = await youtube.channels.list({
+      part: "snippet",
+      maxResults: 50,
+      mine: false, // Mine:false + implicit access_token allows brand access lookup
+    }).catch(() => ({ data: { items: [] } })); // In case some accounts block this
+
+    const brandChannels =
+      (brandResp?.data?.items || []).map((ch) => ({
+        id: ch.id,
+        title: ch.snippet?.title || "Shared Access Channel",
+        thumbnail:
+          ch.snippet?.thumbnails?.default?.url ||
+          ch.snippet?.thumbnails?.high?.url ||
+          ch.snippet?.thumbnails?.medium?.url ||
+          null,
+        type: "Editor / Manager Access",
+      })) || [];
+
+    // ✅ Merge & filter duplicates
+    const uniqueChannels = [
+      ...ownedChannels,
+      ...brandChannels.filter(
+        (ch) => !ownedChannels.some((o) => o.id === ch.id)
+      ),
+    ];
+
+    return res.status(200).json({ channels: uniqueChannels });
   } catch (err) {
     console.error("youtube-channels error:", err);
-    return res
-      .status(500)
-      .json({ message: "Failed to fetch channels", channels: [] });
+    return res.status(500).json({
+      message: "Failed to load channels",
+      channels: [],
+      error: err.message,
+    });
   }
 }

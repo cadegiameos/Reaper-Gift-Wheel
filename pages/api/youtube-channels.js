@@ -21,14 +21,14 @@ export default async function handler(req, res) {
       auth: access_token,
     });
 
-    // ✅ Step 1: Get owned channels (`mine: true`)
+    // ✅ Get ONLY owned channels for now
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
       maxResults: 50,
     });
 
-    const ownedChannels =
+    const channels =
       (resp.data.items || []).map((ch) => ({
         id: ch.id,
         title: ch.snippet?.title || "Untitled",
@@ -37,26 +37,10 @@ export default async function handler(req, res) {
           ch.snippet?.thumbnails?.high?.url ||
           ch.snippet?.thumbnails?.medium?.url ||
           null,
-        access: "owner", // Mark owned channels
+        access: "owner", // Defaulting to owner for now
       })) || [];
 
-    // ✅ Step 2: For each owned channel, test if user is an EDITOR by checking memberships
-    for (const ch of ownedChannels) {
-      try {
-        // Try calling memberships for this channel — if allowed, mark as editor
-        await youtube.membershipsLevels.list({
-          part: "snippet",
-          // Force this channel context
-          auth: access_token,
-        });
-        ch.access = "editor"; // User has elevated permissions
-      } catch {
-        // If this fails, user is likely only owner, not editor of others
-        // Keep it as owner
-      }
-    }
-
-    return res.status(200).json({ channels: ownedChannels });
+    return res.status(200).json({ channels });
   } catch (err) {
     console.error("youtube-channels error:", err);
     return res

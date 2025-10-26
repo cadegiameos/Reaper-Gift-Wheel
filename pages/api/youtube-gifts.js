@@ -19,17 +19,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "No channel selected" });
     }
 
-    // ✅ Initialize OAuth2 client with token
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token });
-
-    // ✅ Use OAuth client instead of raw token
     const youtube = google.youtube({
       version: "v3",
-      auth: oauth2Client,
+      auth: access_token,
     });
 
-    // ✅ Fetch active broadcasts from this account
+    // Active broadcasts for the authed identity (can be the chosen Brand identity if selected on login)
     const broadcasts = await youtube.liveBroadcasts.list({
       part: "snippet",
       broadcastStatus: "active",
@@ -52,7 +47,7 @@ export default async function handler(req, res) {
 
     const liveChatId = activeForChosenChannel.snippet.liveChatId;
 
-    // ✅ Load chat messages
+    // Load chat messages
     const chat = await youtube.liveChatMessages.list({
       liveChatId,
       part: "snippet,authorDetails",
@@ -62,7 +57,7 @@ export default async function handler(req, res) {
     const messages = chat.data.items || [];
     let newEntries = [];
 
-    // ✅ Load processed gift IDs to avoid duplicates
+    // Dedupe by message ID
     const processedGiftIds = (await redis.get("processedGiftIds")) || [];
 
     for (const msg of messages) {
@@ -70,7 +65,7 @@ export default async function handler(req, res) {
       const author = msg?.authorDetails?.displayName || "Unknown";
       const messageId = msg?.id;
 
-      // ✅ Only match gift events
+      // Match “gifted 5 member(s)”
       const match = text.match(/gifted\s+(\d+)\s+member/i);
       if (match && messageId && !processedGiftIds.includes(messageId)) {
         const amount = parseInt(match[1], 10);
@@ -79,18 +74,16 @@ export default async function handler(req, res) {
           const updated = [...existing, ...Array(amount).fill(author)];
           await redis.set("wheelEntries", updated);
 
-          // ✅ Store message ID as processed
           processedGiftIds.push(messageId);
           newEntries.push({ name: author, amount });
         }
       }
     }
 
-    // ✅ Keep list from growing too big
+    // Keep last 500 processed IDs
     if (processedGiftIds.length > 500) {
       processedGiftIds.splice(0, processedGiftIds.length - 500);
     }
-
     await redis.set("processedGiftIds", processedGiftIds);
 
     return res.status(200).json({

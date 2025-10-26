@@ -9,27 +9,23 @@ const redis = new Redis({
 
 export default async function handler(req, res) {
   try {
-    // ✅ Fetch access token
     const access_token = await redis.get("yt_access_token");
-
     if (!access_token) {
-      return res.status(401).json({
-        message: "Not connected to YouTube",
-        channels: [],
-      });
+      return res
+        .status(401)
+        .json({ message: "Not connected to YouTube", channels: [] });
     }
 
-    // ✅ Initialize OAuth2 client correctly
+    // ✅ Set up OAuth client with token
     const oauth2Client = new google.auth.OAuth2();
     oauth2Client.setCredentials({ access_token });
 
-    // ✅ Use OAuth2 client here
     const youtube = google.youtube({
       version: "v3",
       auth: oauth2Client,
     });
 
-    // ✅ Fetch channels where this account is owner/manager
+    // ✅ Get channels the user owns or manages
     const resp = await youtube.channels.list({
       part: "snippet",
       mine: true,
